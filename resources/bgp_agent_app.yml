@@ -1,0 +1,124 @@
+# BGP Banking Customer Support Agent — Databricks App resource
+# This replaces app.yaml/app.yaml.template. DAB variable interpolation
+# (${var.xxx}) replaces the sed substitution that deploy.sh used to do.
+
+resources:
+  apps:
+    bgp_agent:
+      name: ${var.app_name}
+      description: "BGP Bank Workshop - Banking Customer Support Agent"
+      source_code_path: ..
+      config:
+        command:
+          - uvicorn
+          - app.server.app:app
+        env:
+          - name: MLFLOW_TRACKING_URI
+            value: databricks
+          # Experiment id/name come from the DAB-created experiment resource,
+          # so they are never hardcoded and always track what the bundle made.
+          - name: MLFLOW_EXPERIMENT_ID
+            value: ${resources.experiments.bgp_workshop_experiment.id}
+          - name: MLFLOW_EXPERIMENT_NAME
+            value: ${resources.experiments.bgp_workshop_experiment.name}
+          - name: MLFLOW_TRACING_SQL_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: SQL_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: UC_CATALOG
+            value: ${var.uc_catalog}
+          - name: UC_SCHEMA
+            value: ${var.uc_schema}
+          - name: UC_TOOL_SCHEMA
+            value: ${var.uc_catalog}.${var.uc_schema}
+          # Per-participant namespace: the agent calls <prefix>_get_* functions, loads the
+          # <prefix>_bgp_support_prompt, and namespaces its monitoring scorers.
+          - name: UC_TOOL_PREFIX
+            value: ${var.participant_prefix}
+          - name: PROMPT_NAME
+            value: ${var.participant_prefix}_bgp_support_prompt
+          - name: SCORER_PREFIX
+            value: ${var.participant_prefix}
+          # Route the agent LLM through the AI Gateway model service (Claude
+          # Sonnet 5), invoked by its fully-qualified name via /ai-gateway/mlflow/v1.
+          - name: LLM_MODEL_SERVICE
+            value: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bgp_agent_llm
+          - name: DEMO_CUSTOMER_IDS
+            value: ${var.demo_customer_ids}
+          - name: MLFLOW_ENABLE_ASYNC_TRACE_LOGGING
+            value: "false"
+          - name: MLFLOW_TRACE_EXTRACT_ATTACHMENTS
+            value: "false"
+          - name: ENV
+            value: prod
+          # Telco (banking) chat agent — same experiment as above, from the
+          # DAB resource (not hardcoded). TELCO_MODEL defaults in code.
+          - name: TELCO_MLFLOW_EXPERIMENT_ID
+            value: ${resources.experiments.bgp_workshop_experiment.id}
+          - name: TELCO_MLFLOW_EXPERIMENT_PATH
+            value: ${resources.experiments.bgp_workshop_experiment.name}
+      # The MLflow experiment is attached as an app resource so the app's
+      # service principal is granted CAN_EDIT on it declaratively (needed for
+      # set_experiment + logging traces). experiment_id comes from the DAB
+      # experiment resource, so it is never hardcoded.
+      #
+      # UC access, declaratively:
+      #   - DECLARE here: warehouse, experiment, and the MLflow trace tables
+      #     (deterministic names — experiment_<workspace_id>_<experiment id>_otel_* /
+      #     _trace_*; the DAB creates the experiment + its tables BEFORE the app
+      #     during deploy, so they exist when these resources attach).
+      #     Attaching any UC securable also auto-grants the parent USE CATALOG /
+      #     USE SCHEMA.
+      #   - GRANTED BY THE DATA JOB: EXECUTE on the participant's 7
+      #     <prefix>_get_* banking functions (create_uc_functions.py grants the
+      #     app's SP right after creating them — functions can't be app resources
+      #     because they don't exist until the data job runs, and the data job's
+      #     definition is created by this same deploy). SQL functions are
+      #     DEFINER-rights, so no table SELECT is needed.
+      resources:
+        - name: tracing-warehouse
+          description: "SQL warehouse for UC tracing and eval dataset reads"
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        - name: mlflow-experiment
+          description: "Experiment the agent logs traces to (SP gets CAN_EDIT)"
+          experiment:
+            experiment_id: ${resources.experiments.bgp_workshop_experiment.id}
+            permission: CAN_EDIT
+        - name: trace-spans-write
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_spans
+            permission: MODIFY
+        - name: trace-spans-read
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_spans
+            permission: SELECT
+        - name: trace-logs-write
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_logs
+            permission: MODIFY
+        - name: trace-metrics-write
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_metrics
+            permission: MODIFY
+        - name: trace-annotations-write
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_annotations
+            permission: MODIFY
+        # trace_metadata and trace_unified are VIEWS (read-only) — SELECT only.
+        - name: trace-metadata-read
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_trace_metadata
+            permission: SELECT
+        - name: trace-unified-read
+          uc_securable:
+            securable_type: TABLE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_trace_unified
+            permission: SELECT

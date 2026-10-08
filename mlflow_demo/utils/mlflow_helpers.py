@@ -1,77 +1,171 @@
 """MLflow utility functions for tracing and UI link generation."""
 
+import logging
 import os
+import re
 from typing import Optional
 
 
-def setup_local_ide_env():
-  """Set up environment for local IDE development.
+def sanitize_prefix(user: str) -> str:
+  """Turn a username/email into a safe UC identifier prefix (jane.doe@x.com -> jane_doe)."""
+  return re.sub(r'[^a-z0-9]', '_', user.split('@')[0].lower())
 
-  Loads environment variables from .env.local and adds parent directory to path.
+
+def get_dab_experiment_name(user_email: str) -> str:
+  """The UNMANGLED experiment name from resources/bgp_experiment.yml.
+
+  NOTE: dev-mode (`--target dev`) deploys rename it to
+  '/Users/<you>/[dev <prefix>] bgp_bank_workshop', so do NOT look it up by this
+  exact string — use setup_databricks_notebook_env()'s search-based resolution,
+  or pass the exact name from the DAB (${resources.experiments...}) where the
+  DAB can inject it (app env, job parameters).
   """
-  import os
-  import sys
+  return f'/Users/{user_email}/bgp_bank_workshop'
 
-  from dotenv import load_dotenv
 
-  # Try to find .env.local in various locations
-  env_paths = [
-    '../../.env.local',  # From notebooks/ directory to project root
-    '../.env.local',  # From mlflow_demo/ directory
-    '.env.local',  # Current directory
-    './.env.local',  # Explicit current directory
+# Shared-workshop defaults surfaced as notebook widgets. The instructor sets these
+# once per workspace; participants can override them per-run in the widget bar.
+WIDGET_DEFAULTS = {
+  'catalog': 'workshop_bgp',
+  'schema': 'shared_data',
+  'warehouse': 'd9ce200bcd25d8a2',
+}
+
+
+def _find_user_bgp_experiment(mlflow, user_email):
+  """Find the bundle-created experiment for THIS user, robust to DAB name mangling.
+
+  Dev-mode deploys rename the experiment (e.g. '/Users/<you>/[dev <prefix>]
+  bgp_bank_workshop'), so an exact-name lookup fails. Search instead and take the
+  active experiment whose path starts with /Users/<you>/.
+  """
+  exps = mlflow.search_experiments(
+      filter_string="name LIKE '%bgp_bank_workshop'", max_results=100
+  )
+  mine = [
+      e for e in exps
+      if e.name.startswith(f'/Users/{user_email}/') and e.lifecycle_stage == 'active'
   ]
-
-  env_loaded = False
-  for env_path in env_paths:
-    if os.path.exists(env_path):
-      load_dotenv(env_path)
-      env_loaded = True
-      break
-
-  if not env_loaded:
-    # Try to find project root and load from there
-    current_dir = os.getcwd()
-    while current_dir != '/':
-      env_file = os.path.join(current_dir, '.env.local')
-      if os.path.exists(env_file):
-        load_dotenv(env_file)
-        env_loaded = True
-        break
-      current_dir = os.path.dirname(current_dir)
-
-  sys.path.append('../')
-  link_experiment_to_uc_schema()
-  setup_tracing_destination()
+  if not mine:
+    return None
+  if len(mine) > 1:
+    # Most recently updated wins (e.g. leftover experiments from re-deploys).
+    mine.sort(key=lambda e: e.last_update_time or 0, reverse=True)
+  return mine[0]
 
 
 def setup_databricks_notebook_env():
-  """Set up environment for Databricks notebook execution.
+  """Configure a workshop notebook from the CURRENT USER + shared widgets.
 
-  Configures MLflow tracking for Databricks environment and loads app.yaml variables.
+  Every per-participant value (object prefix, prompt name, model service) derives
+  from the running user's email. The widgets carry the shared catalog/schema/
+  warehouse, plus an optional `experiment_name` (jobs pass the exact name from
+  the DAB; interactive runs leave it blank and we find the bundle-created
+  experiment). Requires the bundle to have been deployed.
   """
   import os
-  import sys
 
   import mlflow
-  import yaml
+  from databricks.sdk import WorkspaceClient
+  from databricks.sdk.runtime import dbutils
 
-  sys.path.append('../../')
+  user = WorkspaceClient().current_user.me().user_name
+  prefix = sanitize_prefix(user)
 
-  def load_app_yaml_env_vars(file_path='../../app.yaml'):
-    with open(file_path, 'r') as file:
-      config = yaml.safe_load(file)
+  dbutils.widgets.text('catalog', WIDGET_DEFAULTS['catalog'], 'Shared UC catalog')
+  dbutils.widgets.text('schema', WIDGET_DEFAULTS['schema'], 'Shared UC schema')
+  dbutils.widgets.text('warehouse', WIDGET_DEFAULTS['warehouse'], 'SQL warehouse (tracing)')
+  dbutils.widgets.text(
+      'experiment_name', '', 'MLflow experiment (blank = find the one your bundle deploy created)'
+  )
+  catalog = dbutils.widgets.get('catalog')
+  schema = dbutils.widgets.get('schema')
+  warehouse = dbutils.widgets.get('warehouse')
+  explicit_experiment = dbutils.widgets.get('experiment_name').strip()
 
-    return {item['name']: item['value'] for item in config.get('env', [])}
+  mlflow.set_tracking_uri('databricks')
 
-  # Usage
-  env_vars = load_app_yaml_env_vars()
+  if explicit_experiment:
+    exp = mlflow.get_experiment_by_name(explicit_experiment)
+    if exp is None:
+      raise RuntimeError(f"MLflow experiment '{explicit_experiment}' not found.")
+  else:
+    exp = _find_user_bgp_experiment(mlflow, user)
+    if exp is None:
+      raise RuntimeError(
+          f'No MLflow experiment matching /Users/{user}/…bgp_bank_workshop found — '
+          'run `databricks bundle deploy` first.'
+      )
 
-  os.environ.update(env_vars)
+  # Everything else derives from catalog/schema/prefix — identical to the env the
+  # DAB sets for the app (resources/bgp_agent_app.yml), so notebooks and the app
+  # resolve the same UC objects and experiment.
+  os.environ.update({
+    'MLFLOW_TRACKING_URI': 'databricks',
+    'UC_CATALOG': catalog,
+    'UC_SCHEMA': schema,
+    'UC_TOOL_SCHEMA': f'{catalog}.{schema}',
+    'UC_TOOL_PREFIX': prefix,
+    'PROMPT_NAME': f'{prefix}_bgp_support_prompt',
+    'PROMPT_ALIAS': 'production',
+    'SCORER_PREFIX': prefix,
+    'LLM_MODEL': 'databricks-claude-sonnet-5',  # informational; the agent uses LLM_MODEL_SERVICE
+    'LLM_MODEL_SERVICE': f'{catalog}.{schema}.{prefix}_bgp_agent_llm',
+    'MLFLOW_TRACING_SQL_WAREHOUSE_ID': warehouse,
+    'MLFLOW_ENABLE_ASYNC_TRACE_LOGGING': 'false',
+    'MLFLOW_TRACE_EXTRACT_ATTACHMENTS': 'false',
+    'MLFLOW_EXPERIMENT_ID': exp.experiment_id,
+    'MLFLOW_EXPERIMENT_NAME': exp.name,
+  })
+  mlflow.set_experiment(experiment_id=exp.experiment_id)
+  return exp
 
-  mlflow.set_experiment(experiment_id=os.getenv('MLFLOW_EXPERIMENT_ID'))
-  link_experiment_to_uc_schema()
-  setup_tracing_destination()
+
+def load_or_register_prompt(catalog, schema, prompt_name, fallback_template,
+                             register_if_missing=True):
+  """Use the UC-registered prompt when available; register it when missing.
+
+  The single "ensure prompt" path for every agent context:
+  - Registry has it -> use it (the canonical prompt; what notebook 6's GEPA
+    optimizes and what the app serves after a restart).
+  - Missing + register_if_missing (user contexts, which hold CREATE rights) ->
+    register `fallback_template` as v1 with the `production` alias.
+  - Missing + can't register (e.g. the app's service principal) -> return the
+    fallback text so the agent still runs; the registry becomes canonical once
+    any user context registers it.
+
+  Returns (template_text, source) with source in {'registry', 'registered', 'fallback'}.
+  """
+  import mlflow
+
+  full = f'{catalog}.{schema}.{prompt_name}'
+  try:
+    prompt = mlflow.genai.load_prompt(f'prompts:/{full}')
+    return prompt.template, 'registry'
+  except Exception:
+    pass  # not registered yet
+
+  if register_if_missing:
+    try:
+      prompt = mlflow.genai.register_prompt(
+          name=full,
+          template=fallback_template,
+          commit_message='Initial BGP banking customer-support system prompt',
+      )
+      mlflow.genai.set_prompt_alias(name=full, alias='production', version=prompt.version)
+      # Tag the experiment so the MLflow UI links prompts for it (best-effort).
+      try:
+        mlflow.set_experiment_tags({'mlflow.promptRegistryLocation': f'{catalog}.{schema}'})
+      except Exception:
+        pass
+      return prompt.template, 'registered'
+    except Exception as e:
+      logging.getLogger(__name__).warning('Could not register prompt %s: %s', full, e)
+
+  logging.getLogger(__name__).warning(
+      'Prompt %s not in the registry — using the built-in template.', full
+  )
+  return fallback_template, 'fallback'
 
 
 def link_experiment_to_uc_schema():
@@ -113,43 +207,33 @@ def link_experiment_to_uc_schema():
     pass
 
 
-def setup_tracing_destination():
-  """Configure MLflow tracing to log traces directly to a Unity Catalog schema.
-
-  Requires UC_CATALOG, UC_SCHEMA, and MLFLOW_TRACING_SQL_WAREHOUSE_ID environment variables.
-  Sets MLFLOW_TRACING_DESTINATION env var and calls the Python API as belt-and-suspenders.
-  """
-  import os
-  import mlflow
-  from mlflow.entities import UCSchemaLocation
-
-  uc_catalog = os.getenv('UC_CATALOG')
-  uc_schema = os.getenv('UC_SCHEMA')
-  warehouse_id = os.getenv('MLFLOW_TRACING_SQL_WAREHOUSE_ID')
-
-  if not uc_catalog or not uc_schema:
-    print('⚠️ UC_CATALOG or UC_SCHEMA not set - skipping UC tracing destination setup')
-    return
-
-  if not warehouse_id:
-    print('⚠️ MLFLOW_TRACING_SQL_WAREHOUSE_ID not set - skipping UC tracing destination setup')
-    return
-
-  # Set env var as fallback
-  os.environ['MLFLOW_TRACING_DESTINATION'] = f'{uc_catalog}.{uc_schema}'
-
-  # Set destination via Python API
-  mlflow.tracing.set_destination(
-    destination=UCSchemaLocation(
-      catalog_name=uc_catalog,
-      schema_name=uc_schema,
-    )
-  )
-
-
 def get_mlflow_experiment_id() -> Optional[str]:
-  """Gets the current mlflow experiment id."""
-  return os.environ.get('MLFLOW_EXPERIMENT_ID', None)
+  """Gets the current mlflow experiment id.
+
+  If MLFLOW_EXPERIMENT_ID is set, returns it directly.
+  Otherwise, if MLFLOW_EXPERIMENT_NAME is set, resolves the experiment by name
+  (creating it if needed). This lets the DAB bundle define the experiment as a
+  resource and pass its name — the ID is resolved at app startup.
+  """
+  exp_id = os.environ.get('MLFLOW_EXPERIMENT_ID')
+  if exp_id:
+    return exp_id
+
+  exp_name = os.environ.get('MLFLOW_EXPERIMENT_NAME')
+  if exp_name:
+    import mlflow
+    mlflow.set_tracking_uri('databricks')
+    exp = mlflow.get_experiment_by_name(exp_name)
+    if exp is None:
+      exp_id = mlflow.create_experiment(exp_name)
+      logging.info(f'Created MLflow experiment: {exp_name} (ID: {exp_id})')
+    else:
+      exp_id = exp.experiment_id
+      logging.info(f'Resolved MLflow experiment: {exp_name} (ID: {exp_id})')
+    os.environ['MLFLOW_EXPERIMENT_ID'] = str(exp_id)
+    return str(exp_id)
+
+  return None
 
 
 def ensure_https_protocol(host: str | None) -> str:

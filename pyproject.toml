@@ -8,7 +8,6 @@ dependencies = [
   "fastapi[standard]>=0.115.8",
   "mlflow[databricks]==3.14.0",
   "databricks-agents>=1.5.0",
-  "python-dotenv>=1.0.1",
   "uvicorn>=0.34.0",
   "openai>=1.66.0",
   "openai-agents>=0.4.1",
@@ -19,6 +18,12 @@ dependencies = [
   "requests>=2.31.0",
   "pydantic-settings>=2.1.0",
   # Conflict resolution pins for Databricks Apps pre-installed packages
+  # opentelemetry pinned <1.43: 1.43.0 makes span attributes immutable on
+  # span end, which breaks MLflow 3.14's on_end handler ("Cannot mutate
+  # immutable BoundedAttributes" -> traces never finalize). 1.34.1 matches
+  # the version mlflow[databricks]==3.14.0 resolves to in uv.lock.
+  "opentelemetry-api==1.34.1",
+  "opentelemetry-sdk==1.34.1",
   "tenacity==9.0.0",
   "pillow==11.1.0",
   "websockets==15.0",
@@ -46,7 +51,7 @@ dev = [
 
 
 [tool.ruff]
-src = ["server"]
+src = ["app/server"]
 line-length = 100
 indent-width = 2
 target-version = "py310"
@@ -74,7 +79,6 @@ exclude = [
   "dist",
   "node_modules",
   "venv",
-  "setup/",
   "*.ipynb",
   "**/*.ipynb",
   "**/WORKING_DASH_CODE/",
@@ -102,7 +106,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 [tool.ruff.lint.per-file-ignores]
 "*_test.py" = ["D101", "D102", "D103", "D104"]
 "__init__.py" = ["D104"]
-"setup/notebook_log_generator.py" = ["E402", "W291", "W293", "E501"]
 "mlflow_demo/agent/prompts.py" = ["E501"]
 "mlflow_demo/evaluation/evaluator.py" = ["E501"]
 

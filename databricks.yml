@@ -1,13 +1,64 @@
 bundle:
-  name: dc_assistant
+  name: bgp_bank_workshop
 
 workspace:
-  host: https://e2-demo-field-eng.cloud.databricks.com
+  # Sync the bundle (app source + notebooks) to a friendly per-user folder
+  # instead of the default /Workspace/Users/<user>/.bundle/... path, so each
+  # participant can open the labs at <file_path>/notebooks/.
+  file_path: /Workspace/Users/${workspace.current_user.userName}/bgp_bank_workshop
 
 variables:
+  app_name:
+    description: "Databricks App name. Defaults to bgp-agent-<participant_prefix>. NOTE: app names allow only lowercase letters/numbers/hyphens (<=30 chars) — if your prefix has underscores (e.g. jane_doe), override this with a hyphenated name."
+    default: "bgp-agent-${var.participant_prefix}"
+  uc_catalog:
+    description: "Unity Catalog catalog for participant data"
+    default: "workshop_bgp"
+  uc_schema:
+    description: "Shared UC schema (admin-provided) where every participant's prefixed banking data, functions, prompt, model service, and traces live"
+    default: "shared_data"
+  participant_prefix:
+    description: "Per-participant object prefix. Defaults to the deploying user's short name; override if that isn't a valid UC identifier. The prompt name, model service id, UC tool prefix, and app name are all derived from it."
+    default: "${workspace.current_user.short_name}"
+  warehouse_id:
+    description: "SQL warehouse ID for MLflow tracing and eval dataset reads. Default = the workshop's shared warehouse; the instructor updates this once per workshop."
+    default: "d9ce200bcd25d8a2"
+  workspace_id:
+    description: "Databricks workspace ID (the o= value in the workspace URL) — used to name the MLflow trace tables the app is granted access to."
+    default: "7474646266725179"
+  demo_customer_ids:
+    description: "Comma-separated customer IDs shown in the app dropdown (must have full data in the banking tables)"
+    default: "CUST-00003,CUST-00005,CUST-00011,CUST-00015,CUST-00020,CUST-00028,CUST-00040,CUST-00041,CUST-00046,CUST-00049"
   notebook_root:
-    description: "Root path for notebooks in Databricks workspace"
-    default: /Users/wesley.pasfield@databricks.com/dc-assistant-agent
+    description: "Workspace path where the labs are synced (used by the alignment-pipeline job)"
+    default: "${workspace.file_path}/notebooks"
+  llm_foundation_model:
+    description: "Foundation model the AI Gateway model service routes to (pay-per-token)"
+    default: "models/system.ai.databricks-claude-sonnet-5"
+
+# Derived everywhere from the variables above (not separate variables):
+#   uc_tool_schema  = ${uc_catalog}.${uc_schema}
+#   model service   = ${participant_prefix}_bgp_agent_llm
+#   prompt name     = ${participant_prefix}_bgp_support_prompt
+targets:
+  dev:
+    default: true
+    mode: development
+  prod:
+    mode: production
+    variables:
+      app_name: "bgp-agent-prod"
+      uc_schema: "prod"
+      participant_prefix: "prod"
+
+sync:
+  include:
+    - "workshop/"
+  exclude:
+    - "resources/"
+    - ".github/"
+    - "uv.lock"
+    - "*.md"
 
 include:
   - resources/*.yml

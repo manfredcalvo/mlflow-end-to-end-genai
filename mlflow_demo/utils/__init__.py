@@ -9,10 +9,12 @@ from .mlflow_helpers import (
   generate_labeling_session_link,
   generate_prompt_link,
   generate_trace_links,
+  get_dab_experiment_name,
+  get_mlflow_experiment_id,
   link_experiment_to_uc_schema,
+  load_or_register_prompt,
+  sanitize_prefix,
   setup_databricks_notebook_env,
-  setup_local_ide_env,
-  setup_tracing_destination,
 )
 
 __all__ = [
@@ -24,8 +26,10 @@ __all__ = [
   'generate_evaluation_links',
   'generate_labeling_schema_link',
   'generate_labeling_session_link',
+  'get_dab_experiment_name',
+  'get_mlflow_experiment_id',
   'link_experiment_to_uc_schema',
-  'setup_local_ide_env',
+  'load_or_register_prompt',
+  'sanitize_prefix',
   'setup_databricks_notebook_env',
-  'setup_tracing_destination',
 ]

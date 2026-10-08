@@ -1,0 +1,16 @@
+# Files not needed in the deployed app source (source_code_path = repo root).
+# The app runtime needs: app/ (server + client/build) and mlflow_demo/ (shared lib).
+
+# DAB config (not needed in app source)
+databricks.yml
+.databricksignore
+
+# Large / IDE files
+uv.lock
+.idea/
+.vscode/
+.git/
+.gitignore
+
+# Local dev artifacts
+mlflow.db

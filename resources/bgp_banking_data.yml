@@ -1,0 +1,49 @@
+# BGP Workshop — self-service job that creates ONE participant's banking data and
+# UC functions inside an already-existing shared catalog.schema, namespaced by a
+# per-participant prefix. Each participant runs it themselves:
+#   databricks bundle run bgp_participant_data --target dev --var participant_prefix=<prefix>
+# If participant_prefix is empty, the notebooks derive it from current_user().
+#
+# Both tasks are NOTEBOOKS (notebook_task) so each cell's execution + output is
+# visible in the job run. They do NOT create the catalog or schema — an admin
+# provisions those and grants CREATE TABLE / CREATE FUNCTION (see workshop/README.md).
+
+resources:
+  jobs:
+    bgp_participant_data:
+      name: "BGP Workshop - Participant Banking Data"
+      description: "Creates this participant's <prefix>_bank_* tables and <prefix>_get_* UC functions in the shared schema"
+      tasks:
+        - task_key: generate_data
+          notebook_task:
+            notebook_path: ../workshop/generate_banking_data.py
+            base_parameters:
+              catalog: ${var.uc_catalog}
+              schema: ${var.uc_schema}
+              prefix: ${var.participant_prefix}
+          environment_key: banking_env
+          timeout_seconds: 1200
+
+        - task_key: create_functions
+          depends_on:
+            - task_key: generate_data
+          notebook_task:
+            notebook_path: ../workshop/create_uc_functions.py
+            base_parameters:
+              catalog: ${var.uc_catalog}
+              schema: ${var.uc_schema}
+              prefix: ${var.participant_prefix}
+              # Passed through so the notebook can grant the app's service
+              # principal EXECUTE on the functions it just created (the
+              # participant owns them; the app can't declare them as resources
+              # because the functions don't exist at app-creation time).
+              app_name: ${var.app_name}
+          environment_key: banking_env
+          timeout_seconds: 600
+
+      # Serverless environment for the notebook tasks. faker is installed by the
+      # generate_banking_data notebook via %pip (notebook-scoped), so no deps here.
+      environments:
+        - environment_key: banking_env
+          spec:
+            client: "4"

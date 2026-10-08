@@ -47,12 +47,13 @@ dbutils = get_dbutils()
 # Load shared configuration from multiple sources (in priority order):
 # 1. config/dc_assistant.json file (base config, including tools)
 # 2. DC_ASSISTANT_CONFIG_JSON environment variable
-# 3. Individual environment variables from app.yaml / .env.local
+# 3. Individual environment variables (set by the DAB app config, or by
+#    setup_databricks_notebook_env() in the workshop notebooks)
 #
-# Environment variables (UC_CATALOG, UC_SCHEMA, PROMPT_NAME, LLM_MODEL)
-# always override the base config when set. This allows the JSON file to
-# hold tool definitions and defaults while .env.local controls the workspace.
-# Before app deployment, these values will be propagated to dc_assistant.json.
+# Environment variables (UC_CATALOG, UC_SCHEMA, PROMPT_NAME, LLM_MODEL,
+# UC_TOOL_SCHEMA, UC_TOOL_PREFIX) always override the base config when set.
+# The JSON file holds tool definitions and neutral defaults; the environment
+# supplies the per-participant workspace values.
 # ============================================================================
 def load_config() -> dict:
     """Load configuration from file, JSON env var, or individual env vars.
@@ -109,12 +110,35 @@ def load_config() -> dict:
     if os.getenv("DATABRICKS_HOST"):
         config.setdefault("prompt_registry_auth", {})["databricks_host"] = os.environ["DATABRICKS_HOST"]
 
+    # Tool names: if UC_TOOL_SCHEMA is set, derive tool names from it using the
+    # short names from the config file. This fully parameterizes tool resolution —
+    # the catalog.schema prefix comes from env vars, not from the config file.
+    # Env wins over the config file (same precedence as UC_CATALOG/UC_SCHEMA/etc.)
+    # — the committed dc_assistant.json is a neutral template.
+    tool_schema = os.getenv("UC_TOOL_SCHEMA") or config.get("tools", {}).get("uc_tool_schema")
+    # UC_TOOL_PREFIX namespaces the functions per participant (e.g. jane_doe_get_...),
+    # matching the <prefix>_get_* functions created by the data job in the shared schema.
+    tool_prefix = os.getenv("UC_TOOL_PREFIX", "")
+    p = f"{tool_prefix}_" if tool_prefix else ""
+    if tool_schema:
+        short_names = [
+            name.split(".")[-1] for name in config["tools"].get("uc_tool_names", [])
+        ]
+        config["tools"]["uc_tool_names"] = [
+            f"{tool_schema}.{p}{short}" for short in short_names
+        ]
+
     return config
 
 CONFIG = load_config()
 
 PROMPT_NAME = CONFIG["prompt_registry"]["prompt_name"]
 LLM_ENDPOINT_NAME = CONFIG["llm"]["endpoint_name"]
+# Optional AI Gateway "model service": fully-qualified <catalog>.<schema>.<id>.
+# When set, the agent routes LLM calls through the Unity Gateway model service
+# (OpenAI-compatible endpoint at /ai-gateway/mlflow/v1) by its FQN, instead of a
+# plain serving endpoint. Env wins; the agent config may also provide it.
+LLM_MODEL_SERVICE = os.getenv("LLM_MODEL_SERVICE") or CONFIG.get("llm", {}).get("model_service", "")
 UC_TOOL_NAMES = CONFIG["tools"].get("uc_tool_names", [])
 UC_CATALOG = CONFIG["workspace"]["catalog"]
 UC_SCHEMA = CONFIG["workspace"]["schema"]
@@ -168,16 +192,24 @@ mlflow.set_registry_uri("databricks-uc")
 ############################################
 # Define your LLM endpoint and system prompt
 ############################################
-PROMPT_URI_AGENT = f"prompts:/{UC_CATALOG}.{UC_SCHEMA}.{PROMPT_NAME}@production"
-try:
-    SYSTEM_PROMPT = mlflow.genai.load_prompt(PROMPT_URI_AGENT)
-except Exception as e:
-    # For local development, use a default prompt if registry prompt doesn't exist
-    warnings.warn(f"Could not load prompt from registry: {e}. Using default system prompt for local testing.")
-    class FallbackPrompt:
-        def format(self, **kwargs):
-            return "You are a helpful NFL defensive coordinator assistant. Analyze game data and provide insights about team tendencies, player performance, and strategic recommendations."
-    SYSTEM_PROMPT = FallbackPrompt()
+# Single "ensure prompt" path (mlflow_helpers.load_or_register_prompt):
+# - the UC registry has <catalog>.<schema>.<prompt_name> -> use it (what
+#   notebook 6's GEPA optimizes, and what the app serves after a restart);
+# - missing -> register ORIGINAL_PROMPT_TEMPLATE as v1 with the `production`
+#   alias (user contexts hold CREATE rights; the first agent import registers);
+# - can't register (e.g. the app SP) -> fall back to the built-in template.
+from mlflow_demo.agent.prompts import ORIGINAL_PROMPT_TEMPLATE
+from mlflow_demo.utils.mlflow_helpers import load_or_register_prompt
+
+SYSTEM_PROMPT_TEXT, SYSTEM_PROMPT_SOURCE = load_or_register_prompt(
+    UC_CATALOG, UC_SCHEMA, PROMPT_NAME, ORIGINAL_PROMPT_TEMPLATE, register_if_missing=True
+)
+
+class SYSTEM_PROMPT:
+    """Duck-types the loaded Prompt object: .format(**kwargs) -> prompt text."""
+    @staticmethod
+    def format(**kwargs):
+        return SYSTEM_PROMPT_TEXT
 
 
 ###############################################################################
@@ -362,9 +394,18 @@ class ToolCallingAgent(ResponsesAgent):
         """Initializes the ToolCallingAgent with tools."""
         self.llm_endpoint = llm_endpoint
         self.workspace_client = workspace_client or WorkspaceClient()
-        self.model_serving_client: OpenAI = (
-            self.workspace_client.serving_endpoints.get_open_ai_client()
-        )
+        base_client: OpenAI = self.workspace_client.serving_endpoints.get_open_ai_client()
+        if LLM_MODEL_SERVICE:
+            # Route through the AI Gateway model service. It lives at a different
+            # base path than /serving-endpoints; reuse the SDK client's auth via
+            # with_options (preserves token handling) and call it by its FQN.
+            host = self.workspace_client.config.host.rstrip("/")
+            self.model_serving_client = base_client.with_options(
+                base_url=f"{host}/ai-gateway/mlflow/v1"
+            )
+            self.llm_endpoint = LLM_MODEL_SERVICE
+        else:
+            self.model_serving_client = base_client
         self._tools_dict = {tool.name: tool for tool in tools}
 
     def get_tool_specs(self) -> list[dict]:

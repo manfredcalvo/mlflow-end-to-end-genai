@@ -1,4 +1,4 @@
-"""MLflow evaluation logic for the NFL Defensive Coordinator Assistant."""
+"""MLflow evaluation logic for the BGP Banking Customer Support Assistant."""
 
 import os
 
@@ -29,10 +29,10 @@ UC_SCHEMA = os.environ.get('UC_SCHEMA')
 
 # --- Built-in Scorers ---
 
-# Tone of voice Guideline - Ensure professional tone
+# Tone of voice Guideline - Ensure professional banking tone
 tone = Guidelines(
   name='tone',
-  guidelines='The response maintains a professional, knowledgeable coaching tone appropriate for an NFL defensive coordinator assistant.',
+  guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at BGP Bank.',
 )
 
 # Built-in safety scorer - checks for harmful content
@@ -48,12 +48,14 @@ accuracy = make_judge(
   instructions="""Evaluate whether the agent's response correctly references factual information from the execution trace.
 
   Analyze the full execution {{ trace }} to find tool call results, then assess the response against these rules:
-  - All statistics (percentages, counts, ratios) must match the data returned by tools
-  - Player names, team names, and formation names must be accurate
-  - Tendencies described must be supported by the queried data
-  - No fabricated statistics or invented game situations
+  - All account numbers, balances, and transaction amounts must match the data returned by tools
+  - Customer names, account types, and product names must be accurate
+  - Transaction details (dates, merchants, amounts) must match tool output
+  - Loan details (principal, interest rate, outstanding balance) must be accurate
+  - Credit card info (limits, balances, available credit) must match tool results
+  - No fabricated financial data or invented account details
   - If tools returned no data, the response should acknowledge the lack of data rather than guess
-  - It is acceptable to provide general football knowledge as context, but specific claims must be data-backed
+  - It is acceptable to provide general banking knowledge as context, but specific claims must be data-backed
 
   Respond with 'yes' if the response is factually accurate, or 'no' if it contains errors or fabrications.""",
 )
@@ -66,27 +68,27 @@ relevance = make_judge(
   Agent's response: {{ outputs }}
 
   Assess based on these rules:
-  - The response focuses on the specific game situation, down/distance, or tendency asked about
-  - Defensive recommendations are relevant to the offensive tendency described
-  - The response does not go off-topic with unrelated football analysis
-  - If the question asks about a specific scenario, the answer addresses that scenario
-  - Statistical breakdowns should be relevant to the question context
+  - The response focuses on the specific banking question asked (accounts, transactions, loans, cards, products)
+  - Recommendations and information are relevant to the customer's banking needs
+  - The response does not go off-topic with unrelated banking analysis
+  - If the question asks about a specific account or transaction, the answer addresses that specific item
+  - Financial breakdowns should be relevant to the question context
 
   Respond with 'yes' if the response is relevant, or 'no' if it is off-topic or misses the question.""",
 )
 
 actionability = make_judge(
   name='actionability',
-  instructions="""Evaluate whether the agent's response provides actionable defensive insights.
+  instructions="""Evaluate whether the agent's response provides actionable guidance for the customer.
 
   Agent's response: {{ outputs }}
 
   Assess based on these rules:
-  - Includes specific defensive adjustments or play calls when relevant
-  - Recommendations are practical and implementable in a game plan
-  - Addresses personnel matchups or coverage adjustments when applicable
-  - Avoids vague advice like 'be prepared' without specifics
-  - When data supports it, suggests specific defensive formations or blitz packages
+  - Includes specific next steps or guidance (e.g., how to dispute a transaction, how to apply for a product)
+  - Recommendations are practical and implementable for a banking customer
+  - Addresses the customer's specific situation with relevant suggestions
+  - Avoids vague advice like 'contact support' without specifics when data is available
+  - When data supports it, suggests specific products or services that match the customer's profile
 
   Respond with 'yes' if the response is actionable, or 'no' if it is vague or unhelpful.""",
 )
@@ -97,7 +99,7 @@ response_is_grounded = make_judge(
 
   Analyze the full execution {{ trace }} to find tool call results, then assess whether:
   - The response only makes claims supported by tool output data
-  - Statistics and specific facts cited in the response appear in the tool results
+  - Account balances, transaction amounts, and financial figures cited appear in the tool results
   - The response does not hallucinate data that was not returned by any tool
   - If no tool data was retrieved, the response acknowledges the lack of data
 
@@ -106,6 +108,46 @@ response_is_grounded = make_judge(
 
 # Convenience list of all scorers for easy use in evaluation
 SCORERS = [tone, safety, relevance_to_query, accuracy, relevance, actionability, response_is_grounded]
+
+
+def get_scorers(prefix=''):
+  """Return namespaced scorers for production monitoring.
+
+  When multiple workshop participants share a workspace, scorer names must be
+  namespaced (e.g., 'p01_accuracy') to avoid collisions. For offline evaluation,
+  scorer names are per-experiment and do not need namespacing.
+  """
+  p = f'{prefix}_' if prefix else ''
+
+  _tone = Guidelines(
+    name=f'{p}tone',
+    guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at BGP Bank.',
+  )
+  _safety = Safety()
+  if p:
+    _safety = Safety(name=f'{p}safety')
+  _relevance_to_query = RelevanceToQuery()
+  if p:
+    _relevance_to_query = RelevanceToQuery(name=f'{p}relevance_to_query')
+
+  _accuracy = make_judge(
+    name=f'{p}accuracy',
+    instructions=accuracy.instructions,
+  )
+  _relevance = make_judge(
+    name=f'{p}relevance',
+    instructions=relevance.instructions,
+  )
+  _actionability = make_judge(
+    name=f'{p}actionability',
+    instructions=actionability.instructions,
+  )
+  _response_is_grounded = make_judge(
+    name=f'{p}response_is_grounded',
+    instructions=response_is_grounded.instructions,
+  )
+
+  return [_tone, _safety, _relevance_to_query, _accuracy, _relevance, _actionability, _response_is_grounded]
 
 
 def run_evaluation():

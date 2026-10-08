@@ -1,23 +1,24 @@
 {
   "workspace": {
-    "catalog": "users",
-    "schema": "austin_choi"
+    "catalog": "workshop_bgp",
+    "schema": "shared_data"
   },
   "prompt_registry": {
-    "prompt_name": "dc_assistant_system_prompt"
+    "prompt_name": "bgp_support_prompt"
   },
   "llm": {
-    "endpoint_name": "databricks-claude-3-7-sonnet"
+    "endpoint_name": "databricks-claude-sonnet-5"
   },
   "tools": {
+    "uc_tool_schema": "workshop_bgp.shared_data",
     "uc_tool_names": [
-      "users.austin_choi.who_got_ball_by_down_distance",
-      "users.austin_choi.screen_play_tendencies",
-      "users.austin_choi.tendencies_by_down_distance",
-      "users.austin_choi.tendencies_by_drive_start",
-      "users.austin_choi.tendencies_by_offense_formation",
-      "users.austin_choi.tendencies_two_minute_drill",
-      "users.austin_choi.first_play_after_turnover"
+      "workshop_bgp.shared_data.get_customer_profile",
+      "workshop_bgp.shared_data.get_account_balance",
+      "workshop_bgp.shared_data.get_transaction_history",
+      "workshop_bgp.shared_data.get_loan_details",
+      "workshop_bgp.shared_data.get_credit_card_info",
+      "workshop_bgp.shared_data.get_product_catalog",
+      "workshop_bgp.shared_data.get_branch_info"
     ]
   },
   "prompt_registry_auth": {
@@ -25,6 +26,6 @@
     "secret_scope_name": "dc-assistant-secrets",
     "oauth_client_id_key": "oauth-client-id",
     "oauth_client_secret_key": "oauth-client-secret",
-    "databricks_host": "https://e2-demo-west.cloud.databricks.com/"
+    "databricks_host": ""
   }
 }

@@ -1,0 +1,63 @@
+name: Deploy BGP Agent App
+
+# Production deploy path. Workshop participants do NOT use this — each
+# participant self-deploys from their clone (see workshop/README.md). This
+# workflow deploys the shared prod app on push to main.
+#
+# The frontend is built fresh here (it also verifies the app compiles); the
+# committed app/client/build/ is the fallback for CLI-only deploys.
+# requirements.txt is committed (source of truth) — no generation steps.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Databricks CLI (>= 1.19 for model_services)
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/cli/main/install.sh | sh
+          databricks --version
+
+      - name: Configure Databricks auth
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          mkdir -p ~/.databricks
+          echo "host = $DATABRICKS_HOST" > ~/.databrickscfg
+          echo "token = $DATABRICKS_TOKEN" >> ~/.databrickscfg
+
+      - name: Build frontend
+        run: |
+          cd app/client
+          npm install
+          npm run build
+
+      - name: Validate bundle
+        run: databricks bundle validate --target prod
+
+      - name: Deploy bundle and app
+        env:
+          WAREHOUSE_ID: ${{ secrets.SQL_WAREHOUSE_ID }}
+          NOTEBOOK_ROOT: ${{ secrets.NOTEBOOK_ROOT }}
+        run: |
+          # deploy syncs source + creates resources (app config, experiment,
+          # model service, jobs); run deploys/starts the app from the DAB config
+          # block. The MLflow experiment id/name come from the experiment
+          # resource reference, so nothing is hardcoded.
+          databricks bundle deploy --target prod --auto-approve \
+            --var warehouse_id="$WAREHOUSE_ID" \
+            --var notebook_root="$NOTEBOOK_ROOT"
+          databricks bundle run bgp_agent --target prod \
+            --var warehouse_id="$WAREHOUSE_ID" \
+            --var notebook_root="$NOTEBOOK_ROOT"
