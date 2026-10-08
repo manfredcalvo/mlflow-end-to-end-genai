@@ -17,3 +17,8 @@ resources:
         uc_trace_location:
           catalog: ${var.uc_catalog}
           schema: ${var.uc_schema}
+          # Names the trace tables <catalog>.<schema>.<prefix>_traces_otel_* /
+          # _trace_metadata / _trace_unified instead of MLflow's default
+          # experiment_<workspace_id>_<experiment_id>_* — so the app's grants
+          # derive purely from participant_prefix (no workspace-id variable).
+          table_prefix: ${var.participant_prefix}_traces

@@ -23,9 +23,6 @@ variables:
   warehouse_id:
     description: "SQL warehouse ID for MLflow tracing and eval dataset reads. Default = the workshop's shared warehouse; the instructor updates this once per workshop."
     default: "d9ce200bcd25d8a2"
-  workspace_id:
-    description: "Databricks workspace ID (the o= value in the workspace URL) — used to name the MLflow trace tables the app is granted access to."
-    default: "7474646266725179"
   demo_customer_ids:
     description: "Comma-separated customer IDs shown in the app dropdown (must have full data in the banking tables)"
     default: "CUST-00003,CUST-00005,CUST-00011,CUST-00015,CUST-00020,CUST-00028,CUST-00040,CUST-00041,CUST-00046,CUST-00049"

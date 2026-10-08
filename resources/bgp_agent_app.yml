@@ -63,12 +63,15 @@ resources:
       # experiment resource, so it is never hardcoded.
       #
       # UC access, declaratively:
-      #   - DECLARE here: warehouse, experiment, and the MLflow trace tables
-      #     (deterministic names — experiment_<workspace_id>_<experiment id>_otel_* /
-      #     _trace_*; the DAB creates the experiment + its tables BEFORE the app
-      #     during deploy, so they exist when these resources attach).
-      #     Attaching any UC securable also auto-grants the parent USE CATALOG /
-      #     USE SCHEMA.
+      #   - DECLARE here: warehouse, experiment, and the MLflow trace tables.
+      #     The experiment resource sets uc_trace_location.table_prefix =
+      #     <participant_prefix>_traces, so the tables are named
+      #     <catalog>.<schema>.<prefix>_traces_otel_* / _trace_metadata /
+      #     _trace_unified — fully derivable from the bundle variables (no
+      #     workspace-id or experiment-id in the names). The DAB creates the
+      #     experiment + its tables BEFORE the app during deploy, so they exist
+      #     when these resources attach. Attaching any UC securable also
+      #     auto-grants the parent USE CATALOG / USE SCHEMA.
       #   - GRANTED BY THE DATA JOB: EXECUTE on the participant's 7
       #     <prefix>_get_* banking functions (create_uc_functions.py grants the
       #     app's SP right after creating them — functions can't be app resources
@@ -89,36 +92,36 @@ resources:
         - name: trace-spans-write
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_spans
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_otel_spans
             permission: MODIFY
         - name: trace-spans-read
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_spans
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_otel_spans
             permission: SELECT
         - name: trace-logs-write
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_logs
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_otel_logs
             permission: MODIFY
         - name: trace-metrics-write
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_metrics
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_otel_metrics
             permission: MODIFY
         - name: trace-annotations-write
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_otel_annotations
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_otel_annotations
             permission: MODIFY
         # trace_metadata and trace_unified are VIEWS (read-only) — SELECT only.
         - name: trace-metadata-read
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_trace_metadata
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_trace_metadata
             permission: SELECT
         - name: trace-unified-read
           uc_securable:
             securable_type: TABLE
-            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.experiment_${var.workspace_id}_${resources.experiments.bgp_workshop_experiment.id}_trace_unified
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_traces_trace_unified
             permission: SELECT
