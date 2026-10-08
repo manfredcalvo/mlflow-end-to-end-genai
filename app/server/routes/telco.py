@@ -224,7 +224,9 @@ async def submit_feedback(
     experiment_url = None
     try:
       trace = client.get_trace(request.trace_id)
-      experiment_id = trace.info.experiment_id
+      # UC-schema traces carry no experiment_id on the trace — fall back to
+      # the app's own (DAB-injected) experiment id for the response URL.
+      experiment_id = trace.info.experiment_id or settings.mlflow_experiment_id
       host = settings.databricks_host.rstrip('/')
       experiment_url = f'{host}/ml/experiments/{experiment_id}'
     except Exception as e:
