@@ -33,7 +33,9 @@ export interface TelcoFeedbackBody {
   trace_id: string;
   is_positive: boolean;
   comment?: string;
-  agent_id: string;
+  /** Optional fallback reviewer — the backend prefers the logged-in user
+   *  (X-Forwarded-Email header injected by the Databricks Apps proxy). */
+  agent_id?: string;
 }
 
 export async function postTelcoFeedback(body: TelcoFeedbackBody) {

@@ -11,7 +11,7 @@ import traceback
 from typing import Optional
 
 import mlflow
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from mlflow.client import MlflowClient
 from mlflow.entities import AssessmentSource, AssessmentSourceType
@@ -65,7 +65,9 @@ class FeedbackRequest(BaseModel):
   trace_id: str = Field(..., description='MLflow trace ID')
   is_positive: bool = Field(..., description='Thumbs up = True, thumbs down = False')
   comment: Optional[str] = Field(None, description='Optional feedback comment')
-  agent_id: str = Field(..., description='Reviewer ID who gave feedback')
+  agent_id: Optional[str] = Field(
+      None, description='Fallback reviewer ID; the logged-in user (X-Forwarded-Email) wins'
+  )
 
 
 class FeedbackResponse(BaseModel):
@@ -202,7 +204,12 @@ async def get_mlflow_experiment_info(settings: TelcoSettings = Depends(get_telco
 
 @router.post('/feedback', response_model=FeedbackResponse)
 async def submit_feedback(
-  request: FeedbackRequest, settings: TelcoSettings = Depends(get_telco_settings)
+  request: FeedbackRequest,
+  settings: TelcoSettings = Depends(get_telco_settings),
+  # Injected by the Databricks Apps proxy: the email of the logged-in user
+  # actually using the app. Falls back to the body's agent_id (legacy) or
+  # 'unknown' when the header is absent (e.g. local dev).
+  x_forwarded_email: Optional[str] = Header(None, alias='X-Forwarded-Email'),
 ):
   """Log thumbs-up/down feedback against a telco trace.
 
@@ -223,13 +230,14 @@ async def submit_feedback(
     except Exception as e:
       logger.warning('Could not resolve experiment URL from trace: %s', e)
 
+    reviewer = x_forwarded_email or request.agent_id or 'unknown'
     mlflow.log_feedback(
       trace_id=request.trace_id,
       name='user_feedback',
       value=request.is_positive,
       source=AssessmentSource(
         source_type=AssessmentSourceType.HUMAN,
-        source_id=request.agent_id,
+        source_id=reviewer,
       ),
       rationale=request.comment,
     )

@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -315,62 +316,118 @@ function AssistantFooter({
   experimentUrl: string | null;
 }) {
   const [submitted, setSubmitted] = useState<"up" | "down" | null>(null);
+  // Vote picked but not sent yet — a free-text comment box appears for it.
+  const [pending, setPending] = useState<"up" | "down" | null>(null);
+  const [comment, setComment] = useState("");
+  const [sending, setSending] = useState(false);
   const traceUrl = experimentUrl
     ? `${experimentUrl}/traces?selectedEvaluationId=${traceId}`
     : null;
 
-  async function vote(isPositive: boolean) {
+  async function send(isPositive: boolean, text: string) {
+    setSending(true);
     try {
       await postTelcoFeedback({
         trace_id: traceId,
         is_positive: isPositive,
-        agent_id: "demo-user",
+        comment: text.trim() || undefined,
       });
       setSubmitted(isPositive ? "up" : "down");
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn("feedback failed", e);
+    } finally {
+      setPending(null);
+      setComment("");
+      setSending(false);
     }
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-border/40 flex items-center gap-1 text-xs text-muted-foreground">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 px-2"
-        disabled={submitted !== null}
-        onClick={() => vote(true)}
-      >
-        <ThumbsUp
-          className={`h-3 w-3 ${submitted === "up" ? "text-emerald-600" : ""}`}
-        />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 px-2"
-        disabled={submitted !== null}
-        onClick={() => vote(false)}
-      >
-        <ThumbsDown
-          className={`h-3 w-3 ${submitted === "down" ? "text-rose-600" : ""}`}
-        />
-      </Button>
-      {traceUrl && (
+    <div className="mt-2 pt-2 border-t border-border/40 flex flex-col gap-1 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 px-2 ml-auto"
-          onClick={() => window.open(traceUrl, "_blank")}
+          className="h-6 px-2"
+          disabled={submitted !== null}
+          onClick={() => setPending("up")}
         >
-          <ExternalLink className="h-3 w-3 mr-1" />
-          Trace
+          <ThumbsUp
+            className={`h-3 w-3 ${
+              submitted === "up" || pending === "up"
+                ? "text-emerald-600"
+                : ""
+            }`}
+          />
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2"
+          disabled={submitted !== null}
+          onClick={() => setPending("down")}
+        >
+          <ThumbsDown
+            className={`h-3 w-3 ${
+              submitted === "down" || pending === "down"
+                ? "text-rose-600"
+                : ""
+            }`}
+          />
+        </Button>
+        {traceUrl && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 ml-auto"
+            onClick={() => window.open(traceUrl, "_blank")}
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Trace
+          </Button>
+        )}
+        <Badge variant="outline" className="ml-2 text-[10px] font-mono">
+          {traceId.slice(0, 12)}…
+        </Badge>
+      </div>
+      {pending && (
+        <div className="flex items-center gap-1">
+          <Input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder={
+              pending === "up"
+                ? "What went well? (optional)"
+                : "What went wrong? (optional)"
+            }
+            className="h-6 flex-1 text-xs"
+            autoFocus
+            disabled={sending}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") send(pending === "up", comment);
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2"
+            disabled={sending}
+            onClick={() => send(pending === "up", comment)}
+          >
+            <Send className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2"
+            disabled={sending}
+            onClick={() => send(pending === "up", "")}
+          >
+            Skip
+          </Button>
+        </div>
       )}
-      <Badge variant="outline" className="ml-2 text-[10px] font-mono">
-        {traceId.slice(0, 12)}…
-      </Badge>
     </div>
   );
 }
