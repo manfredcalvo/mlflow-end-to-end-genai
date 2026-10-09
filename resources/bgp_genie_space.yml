@@ -1,0 +1,86 @@
+# BGP Workshop — example Genie agent (space) over the participant's banking data.
+#
+# A Genie space lets users ask natural-language analytics questions over the
+# participant's <prefix>_bank_* tables. This is the "Genie agent" example in the
+# bundle: fully declarative, every table name derives from the bundle variables
+# (interpolation applies because serialized_space is inline bundle config).
+#
+# Serialized-space format: "version 2" — top-level `instructions`
+# (text_instructions + example_question_sqls), `config.sample_questions`,
+# `data_sources.tables[].identifier`. Entry ids are 32-char lowercase hex.
+#
+# NOTE the deploy order: Genie validates that the referenced tables EXIST at
+# creation, and the bank tables are created by the `bgp_participant_data` job —
+# which itself is created by this bundle. So the participant flow is:
+#   1. bundle deploy          (app, experiment, model service, data job — this
+#                               first deploy errors on the Genie space until
+#                               the data exists; the other resources deploy)
+#   2. bundle run bgp_participant_data   (creates the <prefix>_bank_* tables)
+#   3. bundle deploy           (now the Genie space creates cleanly)
+#   4. bundle run bgp_agent
+# See workshop/README.md Phase 1.
+
+resources:
+  genie_spaces:
+    bgp_genie_space:
+      title: "BGP Bank Analytics — ${var.participant_prefix}"
+      description: "Example Genie agent: natural-language analytics over this participant's synthetic BGP Bank (Panama) data — customers, accounts, transactions, loans, credit cards, products, and branches."
+      # The space lives in the participant's bundle folder, next to their notebooks.
+      parent_path: ${workspace.file_path}
+      warehouse_id: ${var.warehouse_id}
+      serialized_space:
+        version: 2
+        instructions:
+          text_instructions:
+            - id: 01f1c3840000000000000000000000a1
+              content:
+                - "## PURPOSE
+                  - Answer analytics questions about SYNTHETIC demo data for BGP Bank (Panama). Balances and amounts are in USD.
+                  - Customers are identified by IDs like CUST-00001, accounts by ACCT-000000, loans by LOAN-00000, cards by CARD-00000.
+                  - Join bank_accounts, bank_loans, and bank_credit_cards to bank_customers via customer_id. Join bank_transactions to bank_accounts via account_id (it also carries customer_id).
+                  - Only count accounts/loans/cards with status 'Active' unless the question explicitly asks about closed/dormant ones or statuses in general."
+          example_question_sqls:
+            - id: 01f1c3840000000000000000000000b1
+              question:
+                - "Which customers have the highest total balance across active accounts?"
+              sql:
+                - "SELECT c.first_name, c.last_name, SUM(a.balance) AS total_balance
+                   FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_accounts a
+                   JOIN ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_customers c
+                     ON a.customer_id = c.customer_id
+                   WHERE a.status = 'Active'
+                   GROUP BY c.first_name, c.last_name
+                   ORDER BY total_balance DESC
+                   LIMIT 10"
+            - id: 01f1c3840000000000000000000000b2
+              question:
+                - "What is the total loan volume by loan type, and the average interest rate per type?"
+              sql:
+                - "SELECT loan_type, COUNT(*) AS loans, SUM(principal) AS total_principal, AVG(interest_rate) AS avg_rate
+                   FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_loans
+                   GROUP BY loan_type
+                   ORDER BY total_principal DESC"
+        config:
+          sample_questions:
+            - id: 01f1c3840000000000000000000000c1
+              question:
+                - "Which customers have the highest total balance across active accounts?"
+            - id: 01f1c3840000000000000000000000c2
+              question:
+                - "What is the total loan volume by loan type, and what is the average interest rate per type?"
+            - id: 01f1c3840000000000000000000000c3
+              question:
+                - "What are the most common transaction categories by count and by total amount?"
+            - id: 01f1c3840000000000000000000000c4
+              question:
+                - "How many customers are there per tier and segment?"
+        # identifiers must be sorted alphabetically (the API enforces it)
+        data_sources:
+          tables:
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_accounts
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_branches
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_credit_cards
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_customers
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_loans
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_products
+            - identifier: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_transactions

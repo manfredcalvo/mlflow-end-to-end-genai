@@ -50,7 +50,7 @@ GRANT USE SCHEMA, CREATE TABLE, CREATE FUNCTION ON SCHEMA workshop_bgp.shared_da
 | Time | Phase | Activity | Duration |
 |------|-------|----------|----------|
 | 0:00 | Intro | Welcome, overview of MLflow GenAI | 15 min |
-| 0:15 | Deploy | Each participant runs the 3 self-service CLI commands | 30 min |
+| 0:15 | Deploy | Each participant runs the 4 self-service CLI commands | 30 min |
 | 0:45 | Watch | Data job + apps finishing in the Jobs UI | 15 min |
 | 1:00 | Use | Participants interact with their app, submit feedback | 30 min |
 | 1:30 | Notebook 1 | Observe with Tracing | 30 min |
@@ -64,7 +64,7 @@ GRANT USE SCHEMA, CREATE TABLE, CREATE FUNCTION ON SCHEMA workshop_bgp.shared_da
 
 ## Phase Details
 
-### Phase 1: Deploy (self-service, 3 commands)
+### Phase 1: Deploy (self-service, 4 commands)
 
 Each participant, from their clone (everything else is auto-derived from their username):
 ```bash
@@ -73,13 +73,20 @@ databricks auth login --host https://<workspace>.cloud.databricks.com --profile 
 # 1. Create their app config, MLflow experiment, AI Gateway model service,
 #    and the self-service data job. No local builds — the built frontend
 #    is committed in app/client/build/.
+#    NOTE: this first deploy reports an EXPECTED error on the Genie space
+#    (Genie validates that its tables exist, and the bank tables are only
+#    created by the data job below). The other resources deploy fine.
 databricks bundle deploy --target dev --profile bgp
 
 # 2. Create their <prefix>_bank_* tables + <prefix>_get_* UC functions
 #    (watch each notebook cell execute in the Jobs UI)
 databricks bundle run bgp_participant_data --target dev --profile bgp
 
-# 3. Deploy + start their app
+# 3. Deploy again — now the Genie space (example Genie agent over the
+#    participant's banking data) creates cleanly
+databricks bundle deploy --target dev --profile bgp
+
+# 4. Deploy + start their app
 databricks bundle run bgp_agent --target dev --profile bgp
 ```
 
@@ -156,6 +163,7 @@ At the end of the workshop, the instructor demonstrates the CI/CD story:
 | Sample questions (used in Notebook 1) | `workshop/banking_questions.jsonl` |
 | Notebooks 0-6 (repo) | `notebooks/` |
 | Notebooks 0-6 (in workspace after deploy) | `/Workspace/Users/<you>/bgp_bank_workshop/notebooks/` |
+| Example Genie agent (space resource) | `resources/bgp_genie_space.yml` |
 | Agent code | `mlflow_demo/agent/agent.py` |
 | Banking prompts | `mlflow_demo/agent/prompts.py` |
 | Banking scorers | `mlflow_demo/evaluation/evaluator.py` |
