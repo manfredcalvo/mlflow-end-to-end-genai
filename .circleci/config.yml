@@ -48,16 +48,41 @@ jobs:
           name: Validate bundle
           command: databricks bundle validate --target prod
 
+      # The deploy sequence mirrors the participant flow (workshop/README.md
+      # Phase 1): the data job that creates the <prefix>_bank_* tables is
+      # itself created by this bundle, and the Genie space validates that its
+      # tables exist — so the job must run between two deploys.
       - run:
-          name: Deploy bundle and app
+          name: Deploy bundle (creates the data job; Genie space defers)
           command: |
-            # deploy syncs source + creates resources (app config, experiment,
-            # model service, jobs); run deploys/starts the app from the DAB
-            # config block. The MLflow experiment id/name come from the
-            # experiment resource reference, so nothing is hardcoded.
+            # On the very first prod deploy the Genie space reports an EXPECTED
+            # error (its bank tables don't exist yet); every other resource
+            # deploys. Subsequent deploys, with the tables already created,
+            # complete clean.
+            databricks bundle deploy --target prod --auto-approve \
+              --var warehouse_id="$SQL_WAREHOUSE_ID" \
+              --var notebook_root="$NOTEBOOK_ROOT" \
+              || echo "EXPECTED on first deploy: Genie space defers until the data job runs."
+
+      - run:
+          name: Run the participant data job (tables, functions, app-SP grants)
+          command: |
+            # Idempotent: fixed Faker seed regenerates identical data,
+            # CREATE OR REPLACE functions, and the app-SP EXECUTE grants.
+            databricks bundle run bgp_participant_data --target prod \
+              --var warehouse_id="$SQL_WAREHOUSE_ID" \
+              --var notebook_root="$NOTEBOOK_ROOT"
+
+      - run:
+          name: Deploy again (Genie space + dashboard create cleanly)
+          command: |
             databricks bundle deploy --target prod --auto-approve \
               --var warehouse_id="$SQL_WAREHOUSE_ID" \
               --var notebook_root="$NOTEBOOK_ROOT"
+
+      - run:
+          name: Deploy and start the app
+          command: |
             databricks bundle run bgp_agent --target prod \
               --var warehouse_id="$SQL_WAREHOUSE_ID" \
               --var notebook_root="$NOTEBOOK_ROOT"
