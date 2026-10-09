@@ -1,32 +1,32 @@
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   TelcoCustomer,
   TelcoExperimentInfo,
 } from "@/components/telco/types";
 
 export function useTelcoCustomers() {
-  return useQuery<TelcoCustomer[]>(
-    ["telco-customers"],
-    async () => {
+  return useQuery<TelcoCustomer[]>({
+    queryKey: ["telco-customers"],
+    queryFn: async () => {
       const res = await fetch("/api/telco/customers");
       if (!res.ok) throw new Error(`Failed to load customers (${res.status})`);
       return res.json();
     },
-    { staleTime: 60_000 },
-  );
+    staleTime: 60_000,
+  });
 }
 
 export function useTelcoExperiment() {
-  return useQuery<TelcoExperimentInfo>(
-    ["telco-experiment"],
-    async () => {
+  return useQuery<TelcoExperimentInfo>({
+    queryKey: ["telco-experiment"],
+    queryFn: async () => {
       const res = await fetch("/api/telco/mlflow-experiment");
       if (!res.ok)
         throw new Error(`Failed to load experiment info (${res.status})`);
       return res.json();
     },
-    { staleTime: 60_000 },
-  );
+    staleTime: 60_000,
+  });
 }
 
 export interface TelcoFeedbackBody {

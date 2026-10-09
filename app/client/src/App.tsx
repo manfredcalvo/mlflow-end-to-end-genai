@@ -1,6 +1,6 @@
 import "./index.css"; // Tailwind styles
 import "./App.css";
-import { QueryClient, QueryClientProvider } from "react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { useTelcoExperiment } from "@/queries/useQueryTelco";
