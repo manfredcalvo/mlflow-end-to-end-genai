@@ -38,3 +38,6 @@ email_app/
 
 app.yaml.previous
 .setup_progress.json
+
+# DAB CLI generated-resources artifact
+.databricks-resources.json
