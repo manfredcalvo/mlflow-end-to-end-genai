@@ -46,7 +46,7 @@ mlflow.openai.autolog()
 logging.getLogger('mlflow.utils.autologging_utils').setLevel(logging.ERROR)
 
 
-SYSTEM_INSTRUCTIONS = """You are the customer support agent for BGP Bank in Panama.
+SYSTEM_INSTRUCTIONS = """You are the customer support agent for a retail bank.
 You help customer-service reps quickly answer questions about a specific customer
 on the call. Be concise, factual, and friendly.
 
@@ -69,9 +69,9 @@ sensitive information the user did not ask for, and never guess data the tools
 didn't return."""
 
 
-# The live app serves the UC-registry prompt (<catalog>.<schema>.<prefix>_bgp_support_prompt)
+# The live app serves the UC-registry prompt (<catalog>.<schema>.<prefix>_bank_support_prompt)
 # when it exists — that's the prompt notebook 6's GEPA optimizes, so the Phase-4
-# `bundle run bgp_agent` redeploy picks up the improved version. The app's service
+# `bundle run bank_agent` redeploy picks up the improved version. The app's service
 # principal cannot CREATE registry objects, so until a user context registers the
 # prompt (the first workshop notebook does), we fall back to the built-in text above.
 from mlflow_demo.utils.mlflow_helpers import load_or_register_prompt

@@ -11,9 +11,9 @@ export function TelcoAssistant() {
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <div>
-        <h1 className="text-xl font-semibold">BGP Bank — Customer Support</h1>
+        <h1 className="text-xl font-semibold">Banking Customer Support</h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          A banking customer-support agent for BGP Bank, traced end-to-end by
+          A banking customer-support agent for the bank, traced end-to-end by
           MLflow. Pick a customer and ask about their accounts, transactions,
           loans, credit cards, products, or branches.
         </p>

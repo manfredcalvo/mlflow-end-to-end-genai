@@ -1,6 +1,6 @@
-# BGP Bank — MLflow 3 GenAI Workshop
+# Banking — MLflow 3 GenAI Workshop
 
-A hands-on **MLflow 3 GenAI** workshop built around a **banking customer-support agent** for BGP Bank (Panama). Participants deploy their own agent app, use it to generate traces and feedback, then work through notebooks that cover the full quality loop — observe, evaluate, find & fix issues, human review, monitor, and optimize — before redeploying the improved agent.
+A hands-on **MLflow 3 GenAI** workshop built around a **banking customer-support agent** for the demo bank. Participants deploy their own agent app, use it to generate traces and feedback, then work through notebooks that cover the full quality loop — observe, evaluate, find & fix issues, human review, monitor, and optimize — before redeploying the improved agent.
 
 The agent is a tool-calling assistant that answers questions about a customer's **accounts, transactions, loans, credit cards, products, and branches** by calling Unity Catalog functions. Every turn is traced end-to-end by MLflow and stored in Unity Catalog.
 
@@ -12,7 +12,7 @@ The agent is a tool-calling assistant that answers questions about a customer's 
 ## Requirements
 
 **To deploy and take the workshop** (participants): just these —
-- **Databricks CLI v1.19.0 or newer** — required to deploy. The agent's LLM is served through an AI Gateway **model service** (`resources/bgp_model_service.yml`), a Beta Databricks Asset Bundles resource (`resources.model_services`) that **older CLIs silently ignore** — `bundle deploy` would create nothing and report no error. Check with `databricks --version`; upgrade with `brew upgrade databricks` or the [install script](https://docs.databricks.com/aws/en/dev-tools/cli/install.html). Confirm support with `databricks bundle schema | grep model_services`.
+- **Databricks CLI v1.19.0 or newer** — required to deploy. The agent's LLM is served through an AI Gateway **model service** (`resources/model_service.yml`), a Beta Databricks Asset Bundles resource (`resources.model_services`) that **older CLIs silently ignore** — `bundle deploy` would create nothing and report no error. Check with `databricks --version`; upgrade with `brew upgrade databricks` or the [install script](https://docs.databricks.com/aws/en/dev-tools/cli/install.html). Confirm support with `databricks bundle schema | grep model_services`.
 - **Git** (to clone the repo).
 - **An authenticated CLI profile** — `databricks auth login --host <workspace-url> --profile <name>`; pass it to every command with `--profile`.
 
@@ -58,13 +58,13 @@ No local Python, uv, or Node needed — the built frontend is committed (`app/cl
 | 1. Deploy (participant) | 4 self-service CLI commands — everything derives from their username |
 | 2. Use & feedback | Chat with the app, submit thumbs up/down, explore traces in MLflow |
 | 3. Notebook labs | Work through notebooks 0–6 in the workspace (nb 1 generates the sample data, nb 2 attaches judge assessments) |
-| 4. Optimize & redeploy | Run GEPA, register the improved prompt, `bundle run bgp_agent` |
+| 4. Optimize & redeploy | Run GEPA, register the improved prompt, `bundle run bank_agent` |
 
 ## Data & tools
 
 Synthetic banking data is generated with Faker into 7 Delta tables (`bank_customers`, `bank_accounts`, `bank_transactions`, `bank_loans`, `bank_credit_cards`, `bank_products`, `bank_branches`) and exposed through 7 Unity Catalog SQL functions (`get_customer_profile`, `get_account_balance`, `get_transaction_history`, `get_loan_details`, `get_credit_card_info`, `get_product_catalog`, `get_branch_info`).
 
-**Per-participant provisioning:** every participant shares **one admin-provisioned catalog + schema** and creates their *own* copy, namespaced by a username prefix (`<prefix>_bank_*` tables, `<prefix>_get_*` functions, where `jane.doe@… → jane_doe`). Each participant runs the serverless DAB job **`bgp_participant_data`** (`resources/bgp_banking_data.yml`, scripts in `workshop/`) — it assumes the catalog/schema already exist and never creates them. The agent resolves the prefix at runtime via the `UC_TOOL_PREFIX` env var, so the LLM-facing tool names stay unprefixed. See `workshop/README.md` for the admin grant checklist.
+**Per-participant provisioning:** every participant shares **one admin-provisioned catalog + schema** and creates their *own* copy, namespaced by a username prefix (`<prefix>_bank_*` tables, `<prefix>_get_*` functions, where `jane.doe@… → jane_doe`). Each participant runs the serverless DAB job **`participant_data`** (`resources/banking_data.yml`, scripts in `workshop/`) — it assumes the catalog/schema already exist and never creates them. The agent resolves the prefix at runtime via the `UC_TOOL_PREFIX` env var, so the LLM-facing tool names stay unprefixed. See `workshop/README.md` for the admin grant checklist.
 
 ## Deployment (Databricks Asset Bundles)
 
@@ -72,29 +72,29 @@ Deployment is 100% DAB-driven — no shell `sed`, no hand-edited `app.yaml`, no 
 
 ```bash
 databricks bundle deploy --target dev --profile <p>                    # app config, experiment, model service, data job
-databricks bundle run bgp_participant_data --target dev --profile <p>  # <prefix>_bank_* tables + <prefix>_get_* functions
+databricks bundle run participant_data --target dev --profile <p>  # <prefix>_bank_* tables + <prefix>_get_* functions
 databricks bundle deploy --target dev --profile <p>                    # 2nd deploy: the Genie space (tables now exist)
-databricks bundle run bgp_agent --target dev --profile <p>             # deploy + start the app
+databricks bundle run bank_agent --target dev --profile <p>             # deploy + start the app
 ```
 
 Zero `--var` flags needed (override `--var app_name=...` only for long/underscored usernames). The **first deploy reports an expected error on the Genie space** — Genie validates that its tables exist, and the bank tables come from the data job; the other resources deploy fine, and the second deploy (after the data job) creates the space. The prompt registers itself on the agent's first import (notebook 1), and the sample traces + judge assessments are generated by notebooks 1–2 as part of the labs.
 
 **CI/CD deploys the shared prod app on push to `main`** via `.github/workflows/deploy.yml` — or the equivalent CircleCI example in `.circleci/config.yml` (same steps, same variables: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `SQL_WAREHOUSE_ID`, `NOTEBOOK_ROOT`), showing the bundle is CI-provider-agnostic. Any push to `main` triggers both pipelines.
 
-**Example Genie agent** (`resources/bgp_genie_space.yml`): a Genie space over the participant's `<prefix>_bank_*` tables — natural-language banking analytics with guided instructions and example SQL, created by the second deploy and usable in the Genie UI.
+**Example Genie agent** (`resources/banking_genie_space.yml`): a Genie space over the participant's `<prefix>_bank_*` tables — natural-language banking analytics with guided instructions and example SQL, created by the second deploy and usable in the Genie UI.
 
-**Embedded AI/BI dashboard** (`resources/bgp_dashboard.yml`): a Lakeview portfolio dashboard over the same prefixed tables (KPIs, transactions by category, customers by tier, loan volume, top accounts), created by the bundle and **embedded in the app** — the app's Analytics tab iframes `{host}/embed/dashboardsv3/{dashboard_id}` with the viewer's workspace session. The dashboard id reaches the app through the DAB resource reference (`DASHBOARD_ID` env); the frontend fetches it via `/api/dashboard`. Requires the workspace's allowed-embed-domains setting to include the app domain.
+**Embedded AI/BI dashboard** (`resources/dashboard.yml`): a Lakeview portfolio dashboard over the same prefixed tables (KPIs, transactions by category, customers by tier, loan volume, top accounts), created by the bundle and **embedded in the app** — the app's Analytics tab iframes `{host}/embed/dashboardsv3/{dashboard_id}` with the viewer's workspace session. The dashboard id reaches the app through the DAB resource reference (`DASHBOARD_ID` env); the frontend fetches it via `/api/dashboard`. Requires the workspace's allowed-embed-domains setting to include the app domain.
 
 ### How the app gets its config
 
-The app's command and environment live in the DAB app resource (`resources/bgp_agent_app.yml`), not a static `app.yaml`. Notably, the MLflow experiment id/name are sourced from the **experiment resource reference** (`${resources.experiments.bgp_workshop_experiment.id}` / `.name`), so they are never hardcoded and always track the experiment the bundle created.
+The app's command and environment live in the DAB app resource (`resources/bank_agent_app.yml`), not a static `app.yaml`. Notably, the MLflow experiment id/name are sourced from the **experiment resource reference** (`${resources.experiments.banking_workshop_experiment.id}` / `.name`), so they are never hardcoded and always track the experiment the bundle created.
 
 ### Service-principal UC access (fully declarative)
 
 The app's service principal needs **no manual grants** — its UC access is split between the DAB app resources and the self-service data job:
 
-- **App resources** (`resources/bgp_agent_app.yml`, attached at deploy): the SQL warehouse, the MLflow experiment (CAN_EDIT), and the MLflow **trace tables** — named `<prefix>_traces_otel_*` (MODIFY; spans also SELECT) and the `<prefix>_traces_trace_metadata`/`_trace_unified` views (SELECT). The experiment resource sets `uc_trace_location.table_prefix = <participant_prefix>_traces`, so every trace-table name derives purely from the bundle's `participant_prefix` — no workspace-id or experiment-id is embedded anywhere. The DAB creates the experiment and its tables *before* the app within the same deploy. Attaching any UC securable also auto-grants the parent `USE CATALOG`/`USE SCHEMA`.
-- **The data job** (`bgp_participant_data` → `workshop/create_uc_functions.py`): the 7 `<prefix>_get_*` functions can't be app resources (they don't exist until the job runs — and the job's definition is created by the same deploy), so the job — running as the participant, who **owns** their functions — grants the app SP `EXECUTE` right after creating them. The functions are DEFINER-rights, so no bank-table SELECT is needed.
+- **App resources** (`resources/bank_agent_app.yml`, attached at deploy): the SQL warehouse, the MLflow experiment (CAN_EDIT), and the MLflow **trace tables** — named `<prefix>_traces_otel_*` (MODIFY; spans also SELECT) and the `<prefix>_traces_trace_metadata`/`_trace_unified` views (SELECT). The experiment resource sets `uc_trace_location.table_prefix = <participant_prefix>_traces`, so every trace-table name derives purely from the bundle's `participant_prefix` — no workspace-id or experiment-id is embedded anywhere. The DAB creates the experiment and its tables *before* the app within the same deploy. Attaching any UC securable also auto-grants the parent `USE CATALOG`/`USE SCHEMA`.
+- **The data job** (`participant_data` → `workshop/create_uc_functions.py`): the 7 `<prefix>_get_*` functions can't be app resources (they don't exist until the job runs — and the job's definition is created by the same deploy), so the job — running as the participant, who **owns** their functions — grants the app SP `EXECUTE` right after creating them. The functions are DEFINER-rights, so no bank-table SELECT is needed.
 
 Everything fits the standard 20-resource app cap (9 used).
 
@@ -140,9 +140,9 @@ ug claude          # Claude Code
 
 Notes: `ug claude --refresh` re-pulls workspace auth/models before launching; `ug upgrade` (or `uv tool upgrade unity-gateway`) updates the CLI; `ug` backs up any agent config it replaces and `ug revert` restores it.
 
-Bundle variables (`databricks.yml`): `app_name` (defaults to `bgp-agent-${participant_prefix}`), `uc_catalog`, `uc_schema` (the single shared schema; defaults `workshop_bgp`/`shared_data`), `participant_prefix` (defaults to the deploying user's short name), `warehouse_id` (defaults to the shared workshop warehouse), `llm_foundation_model` (defaults to Claude Sonnet 5), `demo_customer_ids`, `notebook_root`. Everything else is derived: tool schema = `${uc_catalog}.${uc_schema}`, model service = `<prefix>_bgp_agent_llm`, prompt = `<prefix>_bgp_support_prompt`. Targets: `dev` (default, development mode) and `prod` (production mode, used by CI/CD).
+Bundle variables (`databricks.yml`): `app_name` (defaults to `bank-agent-${participant_prefix}`), `uc_catalog`, `uc_schema` (the single shared schema; defaults `workshop_bank`/`shared_data`), `participant_prefix` (defaults to the deploying user's short name), `warehouse_id` (defaults to the shared workshop warehouse), `llm_foundation_model` (defaults to Claude Sonnet 5), `demo_customer_ids`, `notebook_root`. Everything else is derived: tool schema = `${uc_catalog}.${uc_schema}`, model service = `<prefix>_bank_agent_llm`, prompt = `<prefix>_bank_support_prompt`. Targets: `dev` (default, development mode) and `prod` (production mode, used by CI/CD).
 
-Runtime app env (set from the DAB config block): `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_ID`/`_NAME` (from the experiment resource), `MLFLOW_TRACING_SQL_WAREHOUSE_ID`, `SQL_WAREHOUSE_ID`, `UC_CATALOG`, `UC_SCHEMA`, `UC_TOOL_SCHEMA`, `UC_TOOL_PREFIX` (per-participant namespace), `PROMPT_NAME` (`<prefix>_bgp_support_prompt`), `SCORER_PREFIX`, `LLM_MODEL_SERVICE` (the AI Gateway model service `<catalog>.<schema>.<prefix>_bgp_agent_llm`), `DEMO_CUSTOMER_IDS`, `TELCO_MLFLOW_EXPERIMENT_ID`/`_PATH`.
+Runtime app env (set from the DAB config block): `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_ID`/`_NAME` (from the experiment resource), `MLFLOW_TRACING_SQL_WAREHOUSE_ID`, `SQL_WAREHOUSE_ID`, `UC_CATALOG`, `UC_SCHEMA`, `UC_TOOL_SCHEMA`, `UC_TOOL_PREFIX` (per-participant namespace), `PROMPT_NAME` (`<prefix>_bank_support_prompt`), `SCORER_PREFIX`, `LLM_MODEL_SERVICE` (the AI Gateway model service `<catalog>.<schema>.<prefix>_bank_agent_llm`), `DEMO_CUSTOMER_IDS`, `TELCO_MLFLOW_EXPERIMENT_ID`/`_PATH`.
 
 ## MLflow 3 capabilities demonstrated
 

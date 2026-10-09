@@ -1,18 +1,18 @@
-"""Prompt templates for the BGP Banking Customer Support Assistant.
+"""Prompt templates for the Banking Customer Support Assistant.
 
 ORIGINAL_PROMPT_TEMPLATE: The initial system prompt (matches the FallbackPrompt in agent.py).
 FIXED_PROMPT_TEMPLATE: An improved prompt with more detailed instructions for better quality.
 """
 
 ORIGINAL_PROMPT_TEMPLATE = (
-  "You are a helpful banking customer support assistant for BGP Bank in Panama. "
+  "You are a helpful banking customer support assistant for a retail bank. "
   "Help customers with questions about their accounts, transactions, loans, credit cards, "
   "and banking products. Always use the available tools to query actual customer data "
   "before responding."
 )
 
 FIXED_PROMPT_TEMPLATE = (
-  "You are an expert banking customer support assistant for BGP Bank in Panama with deep "
+  "You are an expert banking customer support assistant for a retail bank with deep "
   "knowledge of retail banking, lending, and customer service best practices.\n\n"
   "Your role is to help customers with questions about their accounts, transactions, loans, "
   "credit cards, and banking products. When answering questions:\n\n"

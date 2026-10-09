@@ -1,4 +1,4 @@
-# BGP Workshop — example Genie agent (space) over the participant's banking data.
+# Banking Workshop — example Genie agent (space) over the participant's banking data.
 #
 # A Genie space lets users ask natural-language analytics questions over the
 # participant's <prefix>_bank_* tables. This is the "Genie agent" example in the
@@ -10,21 +10,21 @@
 # `data_sources.tables[].identifier`. Entry ids are 32-char lowercase hex.
 #
 # NOTE the deploy order: Genie validates that the referenced tables EXIST at
-# creation, and the bank tables are created by the `bgp_participant_data` job —
+# creation, and the bank tables are created by the `participant_data` job —
 # which itself is created by this bundle. So the participant flow is:
 #   1. bundle deploy          (app, experiment, model service, data job — this
 #                               first deploy errors on the Genie space until
 #                               the data exists; the other resources deploy)
-#   2. bundle run bgp_participant_data   (creates the <prefix>_bank_* tables)
+#   2. bundle run participant_data   (creates the <prefix>_bank_* tables)
 #   3. bundle deploy           (now the Genie space creates cleanly)
-#   4. bundle run bgp_agent
+#   4. bundle run bank_agent
 # See workshop/README.md Phase 1.
 
 resources:
   genie_spaces:
-    bgp_genie_space:
-      title: "BGP Bank Analytics — ${var.participant_prefix}"
-      description: "Example Genie agent: natural-language analytics over this participant's synthetic BGP Bank (Panama) data — customers, accounts, transactions, loans, credit cards, products, and branches."
+    banking_genie_space:
+      title: "Bank Analytics — ${var.participant_prefix}"
+      description: "Example Genie agent: natural-language analytics over this participant's synthetic banking demo data — customers, accounts, transactions, loans, credit cards, products, and branches."
       # The space lives in the participant's bundle folder, next to their notebooks.
       parent_path: ${workspace.file_path}
       warehouse_id: ${var.warehouse_id}
@@ -35,7 +35,7 @@ resources:
             - id: 01f1c3840000000000000000000000a1
               content:
                 - "## PURPOSE
-                  - Answer analytics questions about SYNTHETIC demo data for BGP Bank (Panama). Balances and amounts are in USD.
+                  - Answer analytics questions about SYNTHETIC demo data for a retail bank. Balances and amounts are in USD.
                   - Customers are identified by IDs like CUST-00001, accounts by ACCT-000000, loans by LOAN-00000, cards by CARD-00000.
                   - Join bank_accounts, bank_loans, and bank_credit_cards to bank_customers via customer_id. Join bank_transactions to bank_accounts via account_id (it also carries customer_id).
                   - Only count accounts/loans/cards with status 'Active' unless the question explicitly asks about closed/dormant ones or statuses in general."

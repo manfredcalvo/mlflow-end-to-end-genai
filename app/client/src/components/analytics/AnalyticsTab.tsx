@@ -34,7 +34,7 @@ export function AnalyticsTab() {
     <div className="w-full h-full p-2">
       <iframe
         src={dashboard.embed_url}
-        title="BGP Bank Portfolio Dashboard"
+        title="Banking Portfolio Dashboard"
         className="w-full h-full min-h-[85vh] rounded-lg border border-border"
         // The workspace embed surface is a full app; keep iframe chrome off.
         referrerPolicy="no-referrer-when-downgrade"

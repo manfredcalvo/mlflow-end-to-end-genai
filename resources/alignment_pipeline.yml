@@ -1,14 +1,14 @@
-# BGP Agent - Judge Alignment & Prompt Optimization Pipeline
+# Banking Agent - Judge Alignment & Prompt Optimization Pipeline
 
 resources:
   jobs:
-    bgp_alignment_pipeline:
-      name: "BGP Agent - Alignment Pipeline"
+    alignment_pipeline:
+      name: "Banking Agent - Alignment Pipeline"
       description: "Runs Judge Alignment and Prompt Optimization after labeling is complete"
 
       schedule:
         quartz_cron_expression: "0 0 8 * * ?"
-        timezone_id: America/Panama
+        timezone_id: Etc/UTC
         pause_status: PAUSED
 
       tasks:
@@ -22,7 +22,7 @@ resources:
               catalog: ${var.uc_catalog}
               schema: ${var.uc_schema}
               warehouse: ${var.warehouse_id}
-              experiment_name: ${resources.experiments.bgp_workshop_experiment.name}
+              experiment_name: ${resources.experiments.banking_workshop_experiment.name}
           environment_key: default_environment
           timeout_seconds: 7200
 
@@ -36,7 +36,7 @@ resources:
               catalog: ${var.uc_catalog}
               schema: ${var.uc_schema}
               warehouse: ${var.warehouse_id}
-              experiment_name: ${resources.experiments.bgp_workshop_experiment.name}
+              experiment_name: ${resources.experiments.banking_workshop_experiment.name}
           environment_key: default_environment
           timeout_seconds: 7200
 

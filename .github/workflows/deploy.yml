@@ -1,4 +1,4 @@
-name: Deploy BGP Agent App
+name: Deploy Banking Agent App
 
 # Production deploy path. Workshop participants do NOT use this — each
 # participant self-deploys from their clone (see workshop/README.md). This
@@ -73,7 +73,7 @@ jobs:
         run: |
           # Idempotent: fixed Faker seed regenerates identical data,
           # CREATE OR REPLACE functions, and the app-SP EXECUTE grants.
-          databricks bundle run bgp_participant_data --target prod \
+          databricks bundle run participant_data --target prod \
             --var warehouse_id="$WAREHOUSE_ID" \
             --var notebook_root="$NOTEBOOK_ROOT"
 
@@ -91,6 +91,6 @@ jobs:
           WAREHOUSE_ID: ${{ secrets.SQL_WAREHOUSE_ID }}
           NOTEBOOK_ROOT: ${{ secrets.NOTEBOOK_ROOT }}
         run: |
-          databricks bundle run bgp_agent --target prod \
+          databricks bundle run bank_agent --target prod \
             --var warehouse_id="$WAREHOUSE_ID" \
             --var notebook_root="$NOTEBOOK_ROOT"

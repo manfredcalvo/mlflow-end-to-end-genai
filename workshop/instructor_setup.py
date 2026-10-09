@@ -1,10 +1,10 @@
-"""Pre-workshop PREFLIGHT for the BGP MLflow GenAI workshop.
+"""Pre-workshop PREFLIGHT for the Banking MLflow GenAI workshop.
 
 The instructor no longer creates the catalog/schema or per-participant data —
 a workspace **admin** provisions ONE catalog + ONE schema and grants access, and
 each participant then self-provisions their own prefixed objects by running the
-`bgp_participant_data` + `bgp_participant_setup` jobs from their clone (see
-workshop/README.md).
+the `participant_data` job from their clone (the prompt/traces/evals
+setup lives in the workshop notebooks — see workshop/README.md).
 
 This script only *verifies* the shared schema is present and writable by the
 current user, and prints the admin grant checklist. Run it on a Databricks
@@ -13,7 +13,7 @@ cluster (Spark required).
 Usage (Databricks notebook):
     %run workshop/instructor_setup.py
 Env:
-    WORKSHOP_CATALOG (default workshop_bgp), WORKSHOP_SCHEMA (default shared_data)
+    WORKSHOP_CATALOG (default workshop_bank), WORKSHOP_SCHEMA (default shared_data)
 """
 
 import os
@@ -23,7 +23,7 @@ try:
 except ImportError:
     raise ImportError("Run this on a Databricks cluster with Spark available.")
 
-CATALOG = os.getenv("WORKSHOP_CATALOG", "workshop_bgp")
+CATALOG = os.getenv("WORKSHOP_CATALOG", "workshop_bank")
 SCHEMA = os.getenv("WORKSHOP_SCHEMA", "shared_data")
 
 
@@ -33,7 +33,7 @@ def main():
     user = spark.sql("select current_user()").collect()[0][0]
 
     print("=" * 64)
-    print("BGP Workshop — preflight")
+    print("Banking Workshop — preflight")
     print(f"  user:   {user}")
     print(f"  schema: {full}")
     print("=" * 64)

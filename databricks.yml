@@ -1,19 +1,19 @@
 bundle:
-  name: bgp_bank_workshop
+  name: banking_workshop
 
 workspace:
   # Sync the bundle (app source + notebooks) to a friendly per-user folder
   # instead of the default /Workspace/Users/<user>/.bundle/... path, so each
   # participant can open the labs at <file_path>/notebooks/.
-  file_path: /Workspace/Users/${workspace.current_user.userName}/bgp_bank_workshop
+  file_path: /Workspace/Users/${workspace.current_user.userName}/banking_workshop
 
 variables:
   app_name:
-    description: "Databricks App name. Defaults to bgp-agent-<participant_prefix>. NOTE: app names allow only lowercase letters/numbers/hyphens (<=30 chars) — if your prefix has underscores (e.g. jane_doe), override this with a hyphenated name."
-    default: "bgp-agent-${var.participant_prefix}"
+    description: "Databricks App name. Defaults to bank-agent-<participant_prefix>. NOTE: app names allow only lowercase letters/numbers/hyphens (<=30 chars) — if your prefix has underscores (e.g. jane_doe), override this with a hyphenated name."
+    default: "bank-agent-${var.participant_prefix}"
   uc_catalog:
     description: "Unity Catalog catalog for participant data"
-    default: "workshop_bgp"
+    default: "workshop_bank"
   uc_schema:
     description: "Shared UC schema (admin-provided) where every participant's prefixed banking data, functions, prompt, model service, and traces live"
     default: "shared_data"
@@ -35,8 +35,8 @@ variables:
 
 # Derived everywhere from the variables above (not separate variables):
 #   uc_tool_schema  = ${uc_catalog}.${uc_schema}
-#   model service   = ${participant_prefix}_bgp_agent_llm
-#   prompt name     = ${participant_prefix}_bgp_support_prompt
+#   model service   = ${participant_prefix}_bank_agent_llm
+#   prompt name     = ${participant_prefix}_bank_support_prompt
 targets:
   dev:
     default: true
@@ -44,7 +44,7 @@ targets:
   prod:
     mode: production
     variables:
-      app_name: "bgp-agent-prod"
+      app_name: "bank-agent-prod"
       uc_schema: "prod"
       participant_prefix: "prod"
 

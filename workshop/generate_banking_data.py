@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Generate BGP banking data
+# MAGIC # Generate banking data
 # MAGIC
 # MAGIC Creates this participant's `<prefix>_bank_*` Delta tables in an existing
 # MAGIC `catalog.schema`. Uses Faker with a fixed seed for reproducibility. Driven by
-# MAGIC the `catalog`, `schema`, and `prefix` widgets (set by the `bgp_participant_data`
+# MAGIC the `catalog`, `schema`, and `prefix` widgets (set by the `participant_data`
 # MAGIC job). If `prefix` is blank it is derived from `current_user()`.
 
 # COMMAND ----------
@@ -33,7 +33,7 @@ from pyspark.sql import SparkSession
 
 from mlflow_demo.utils.mlflow_helpers import sanitize_prefix
 
-dbutils.widgets.text("catalog", "workshop_bgp", "UC catalog")
+dbutils.widgets.text("catalog", "workshop_bank", "UC catalog")
 dbutils.widgets.text("schema", "shared_data", "UC schema")
 dbutils.widgets.text("prefix", "", "Per-participant prefix (blank = current_user)")
 
@@ -60,7 +60,7 @@ print(f"  Spark version: {spark.version}")
 
 # COMMAND ----------
 
-CITIES = ["Panama City", "Colon", "David", "Santiago", "Chitre", "La Chorrera"]
+CITIES = ["Springfield", "Fairview", "Riverton", "Lakeside", "Brookfield", "Milldale"]
 ACCOUNT_TYPES = ["Checking", "Savings", "Certificate of Deposit"]
 CARD_TYPES = ["Visa Platinum", "Mastercard Gold", "Visa Signature", "American Express"]
 LOAN_TYPES = ["Mortgage", "Auto", "Personal", "Home Equity"]
@@ -103,7 +103,7 @@ def generate_customers():
             "customer_since": FAKE.date_between(start_date="-10y", end_date="-1y"),
             "tier": random.choice(TIER_OPTIONS),
             "segment": random.choices(SEGMENTS, weights=[70, 20, 10])[0],
-            "country": "Panama",
+            "country": "United States",
         })
     return rows
 
@@ -244,7 +244,7 @@ def generate_products():
             "interest_rate": rate,
             "min_balance": min_bal,
             "features": f"Benefits: {', '.join(FAKE.words(3))}",
-            "eligibility": "BGP customer with valid ID and minimum balance",
+            "eligibility": "bank customer with valid ID and minimum balance",
         })
     # Pad to PRODUCT_COUNT
     while len(rows) < PRODUCT_COUNT:
@@ -257,7 +257,7 @@ def generate_products():
             "interest_rate": Decimal(str(round(random.uniform(0, 8), 2))),
             "min_balance": Decimal(str(random.choice([0, 100, 1000, 5000, 10000]))),
             "features": f"Features: {', '.join(FAKE.words(4))}",
-            "eligibility": "BGP customer with valid ID",
+            "eligibility": "bank customer with valid ID",
         })
     return rows[:PRODUCT_COUNT]
 
@@ -268,7 +268,7 @@ def generate_branches():
         city = random.choice(CITIES)
         rows.append({
             "branch_id": f"BR-{i+1:03d}",
-            "branch_name": f"BGP {city} Branch {i+1}",
+            "branch_name": f"{city} Branch {i+1}",
             "address": FAKE.street_address(),
             "city": city,
             "phone": FAKE.phone_number(),

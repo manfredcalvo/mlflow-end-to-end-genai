@@ -69,7 +69,7 @@ jobs:
           command: |
             # Idempotent: fixed Faker seed regenerates identical data,
             # CREATE OR REPLACE functions, and the app-SP EXECUTE grants.
-            databricks bundle run bgp_participant_data --target prod \
+            databricks bundle run participant_data --target prod \
               --var warehouse_id="$SQL_WAREHOUSE_ID" \
               --var notebook_root="$NOTEBOOK_ROOT"
 
@@ -83,7 +83,7 @@ jobs:
       - run:
           name: Deploy and start the app
           command: |
-            databricks bundle run bgp_agent --target prod \
+            databricks bundle run bank_agent --target prod \
               --var warehouse_id="$SQL_WAREHOUSE_ID" \
               --var notebook_root="$NOTEBOOK_ROOT"
 

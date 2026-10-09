@@ -1,11 +1,11 @@
-"""function_tool wrappers around the BGP banking UC functions.
+"""function_tool wrappers around the banking UC functions.
 
 Uses DatabricksFunctionClient with serverless execution, so we don't need a
 SQL warehouse grant for the app SP — UC routes the function call to managed
 serverless compute. The app SP only needs USE SCHEMA + EXECUTE on the schema.
 
 The target schema is read from UC_TOOL_SCHEMA (set by the DAB bundle), e.g.
-`casaman_aws_stable_catalog.bgp_workshop`. This keeps the banking chat agent
+`casaman_aws_stable_catalog.banking_workshop`. This keeps the banking chat agent
 fully parameterized from the bundle variables.
 """
 
@@ -61,7 +61,7 @@ async def _call_function(fn_name: str, params: dict) -> str:
 
 # ---------------------------------------------------------------------------
 # Tool definitions — names and docstrings drive the LLM's tool selection.
-# These wrap the 7 BGP banking UC functions.
+# These wrap the 7 banking UC functions.
 # ---------------------------------------------------------------------------
 
 
@@ -126,7 +126,7 @@ async def get_credit_card_info(customer_id: str) -> str:
 
 @function_tool
 async def get_product_catalog(category: Optional[str] = None) -> str:
-  """List BGP banking products, optionally filtered by category.
+  """List banking products, optionally filtered by category.
 
   Args:
     category: Product category: Account, Loan, Card, or Investment. Omit for all products.
@@ -136,8 +136,8 @@ async def get_product_catalog(category: Optional[str] = None) -> str:
 
 @function_tool
 async def get_branch_info(city: Optional[str] = None) -> str:
-  """List BGP branches, optionally filtered by city (e.g., Panama City, Colon,
-  David). Returns address, phone, hours, and services.
+  """List bank branches, optionally filtered by city (e.g., Springfield, Fairview,
+  Riverton). Returns address, phone, hours, and services.
 
   Args:
     city: City name to filter by. Omit for all branches.

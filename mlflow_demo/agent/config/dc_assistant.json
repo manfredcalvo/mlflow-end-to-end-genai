@@ -1,24 +1,24 @@
 {
   "workspace": {
-    "catalog": "workshop_bgp",
+    "catalog": "workshop_bank",
     "schema": "shared_data"
   },
   "prompt_registry": {
-    "prompt_name": "bgp_support_prompt"
+    "prompt_name": "bank_support_prompt"
   },
   "llm": {
     "endpoint_name": "databricks-claude-sonnet-5"
   },
   "tools": {
-    "uc_tool_schema": "workshop_bgp.shared_data",
+    "uc_tool_schema": "workshop_bank.shared_data",
     "uc_tool_names": [
-      "workshop_bgp.shared_data.get_customer_profile",
-      "workshop_bgp.shared_data.get_account_balance",
-      "workshop_bgp.shared_data.get_transaction_history",
-      "workshop_bgp.shared_data.get_loan_details",
-      "workshop_bgp.shared_data.get_credit_card_info",
-      "workshop_bgp.shared_data.get_product_catalog",
-      "workshop_bgp.shared_data.get_branch_info"
+      "workshop_bank.shared_data.get_customer_profile",
+      "workshop_bank.shared_data.get_account_balance",
+      "workshop_bank.shared_data.get_transaction_history",
+      "workshop_bank.shared_data.get_loan_details",
+      "workshop_bank.shared_data.get_credit_card_info",
+      "workshop_bank.shared_data.get_product_catalog",
+      "workshop_bank.shared_data.get_branch_info"
     ]
   },
   "prompt_registry_auth": {

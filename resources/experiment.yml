@@ -1,4 +1,4 @@
-# BGP Workshop — MLflow Experiment resource
+# Banking Workshop — MLflow Experiment resource
 # The DAB creates this experiment automatically when the bundle is deployed.
 # The experiment name uses the deploying user's workspace path, so each
 # participant gets their own experiment. Traces are stored in the participant's
@@ -6,11 +6,11 @@
 
 resources:
   experiments:
-    bgp_workshop_experiment:
-      name: /Users/${workspace.current_user.userName}/bgp_bank_workshop
+    banking_workshop_experiment:
+      name: /Users/${workspace.current_user.userName}/banking_workshop
       tags:
         - key: purpose
-          value: bgp_workshop
+          value: banking_workshop
         - key: product
           value: mlflow_genai
       trace_location:

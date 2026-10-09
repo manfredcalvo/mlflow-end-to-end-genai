@@ -37,7 +37,7 @@ export function AppSidebar({
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
-                    BGP Bank Assistant
+                    Banking Assistant
                   </span>
                 </div>
               </Link>

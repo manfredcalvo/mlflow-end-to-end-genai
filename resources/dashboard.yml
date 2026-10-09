@@ -1,4 +1,4 @@
-# BGP Workshop — example AI/BI (Lakeview) dashboard, embedded in the app.
+# Banking Workshop — example AI/BI (Lakeview) dashboard, embedded in the app.
 #
 # A banking portfolio overview over the participant's <prefix>_bank_* tables:
 # 3 KPIs (total customers, active accounts, active loan principal),
@@ -10,16 +10,16 @@
 # JSON content), which is what makes the per-participant prefixed table
 # names work. Every dataset query was tested against the real tables.
 #
-# The app embeds it via iframe (resources/bgp_agent_app.yml passes the
+# The app embeds it via iframe (resources/bank_agent_app.yml passes the
 # dashboard id as the DASHBOARD_ID env var from
-# ${resources.dashboards.bgp_portfolio_dashboard.id}); the frontend's
+# ${resources.dashboards.banking_portfolio_dashboard.id}); the frontend's
 # Analytics tab renders {host}/embed/dashboardsv3/<id> with the viewer's
 # workspace session.
 
 resources:
   dashboards:
-    bgp_portfolio_dashboard:
-      display_name: "BGP Bank Portfolio Dashboard — ${var.participant_prefix}"
+    banking_portfolio_dashboard:
+      display_name: "Banking Portfolio Dashboard — ${var.participant_prefix}"
       parent_path: ${workspace.file_path}
       warehouse_id: ${var.warehouse_id}
       embed_credentials: true
@@ -58,14 +58,14 @@ resources:
               - "WHERE status = 'Active' ORDER BY balance DESC LIMIT 10 "
         pages:
           - name: overview
-            displayName: BGP Bank Overview
+            displayName: Banking Overview
             pageType: PAGE_TYPE_CANVAS
             layoutVersion: GRID_V1
             layout:
               - widget:
                   name: title
                   multilineTextboxSpec:
-                    lines: ["## BGP Bank — Portfolio Overview"]
+                    lines: ["## Banking — Portfolio Overview"]
                 position: {x: 0, y: 0, width: 12, height: 1}
               - widget:
                   name: subtitle

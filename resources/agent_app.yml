@@ -1,12 +1,12 @@
-# BGP Banking Customer Support Agent — Databricks App resource
+# Banking Customer Support Agent — Databricks App resource
 # This replaces app.yaml/app.yaml.template. DAB variable interpolation
 # (${var.xxx}) replaces the sed substitution that deploy.sh used to do.
 
 resources:
   apps:
-    bgp_agent:
+    bank_agent:
       name: ${var.app_name}
-      description: "BGP Bank Workshop - Banking Customer Support Agent"
+      description: "the bank Workshop - Banking Customer Support Agent"
       source_code_path: ..
       config:
         command:
@@ -18,9 +18,9 @@ resources:
           # Experiment id/name come from the DAB-created experiment resource,
           # so they are never hardcoded and always track what the bundle made.
           - name: MLFLOW_EXPERIMENT_ID
-            value: ${resources.experiments.bgp_workshop_experiment.id}
+            value: ${resources.experiments.banking_workshop_experiment.id}
           - name: MLFLOW_EXPERIMENT_NAME
-            value: ${resources.experiments.bgp_workshop_experiment.name}
+            value: ${resources.experiments.banking_workshop_experiment.name}
           - name: MLFLOW_TRACING_SQL_WAREHOUSE_ID
             value: ${var.warehouse_id}
           - name: SQL_WAREHOUSE_ID
@@ -32,23 +32,23 @@ resources:
           - name: UC_TOOL_SCHEMA
             value: ${var.uc_catalog}.${var.uc_schema}
           # Per-participant namespace: the agent calls <prefix>_get_* functions, loads the
-          # <prefix>_bgp_support_prompt, and namespaces its monitoring scorers.
+          # <prefix>_bank_support_prompt, and namespaces its monitoring scorers.
           - name: UC_TOOL_PREFIX
             value: ${var.participant_prefix}
           - name: PROMPT_NAME
-            value: ${var.participant_prefix}_bgp_support_prompt
+            value: ${var.participant_prefix}_bank_support_prompt
           - name: SCORER_PREFIX
             value: ${var.participant_prefix}
           # Route the agent LLM through the AI Gateway model service (Claude
           # Sonnet 5), invoked by its fully-qualified name via /ai-gateway/mlflow/v1.
           - name: LLM_MODEL_SERVICE
-            value: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bgp_agent_llm
+            value: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_agent_llm
           - name: DEMO_CUSTOMER_IDS
             value: ${var.demo_customer_ids}
           # The bundle-created AI/BI dashboard the app's Analytics tab embeds
           # (iframe to /embed/dashboardsv3/<id>, viewer's workspace session).
           - name: DASHBOARD_ID
-            value: ${resources.dashboards.bgp_portfolio_dashboard.id}
+            value: ${resources.dashboards.banking_portfolio_dashboard.id}
           - name: MLFLOW_ENABLE_ASYNC_TRACE_LOGGING
             value: "false"
           - name: MLFLOW_TRACE_EXTRACT_ATTACHMENTS
@@ -58,9 +58,9 @@ resources:
           # Telco (banking) chat agent — same experiment as above, from the
           # DAB resource (not hardcoded). TELCO_MODEL defaults in code.
           - name: TELCO_MLFLOW_EXPERIMENT_ID
-            value: ${resources.experiments.bgp_workshop_experiment.id}
+            value: ${resources.experiments.banking_workshop_experiment.id}
           - name: TELCO_MLFLOW_EXPERIMENT_PATH
-            value: ${resources.experiments.bgp_workshop_experiment.name}
+            value: ${resources.experiments.banking_workshop_experiment.name}
       # The MLflow experiment is attached as an app resource so the app's
       # service principal is granted CAN_EDIT on it declaratively (needed for
       # set_experiment + logging traces). experiment_id comes from the DAB
@@ -91,7 +91,7 @@ resources:
         - name: mlflow-experiment
           description: "Experiment the agent logs traces to (SP gets CAN_EDIT)"
           experiment:
-            experiment_id: ${resources.experiments.bgp_workshop_experiment.id}
+            experiment_id: ${resources.experiments.banking_workshop_experiment.id}
             permission: CAN_EDIT
         - name: trace-spans-write
           uc_securable:

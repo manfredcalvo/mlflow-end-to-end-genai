@@ -1,7 +1,7 @@
-# BGP Workshop — self-service job that creates ONE participant's banking data and
+# Banking Workshop — self-service job that creates ONE participant's banking data and
 # UC functions inside an already-existing shared catalog.schema, namespaced by a
 # per-participant prefix. Each participant runs it themselves:
-#   databricks bundle run bgp_participant_data --target dev --var participant_prefix=<prefix>
+#   databricks bundle run participant_data --target dev --var participant_prefix=<prefix>
 # If participant_prefix is empty, the notebooks derive it from current_user().
 #
 # Both tasks are NOTEBOOKS (notebook_task) so each cell's execution + output is
@@ -10,8 +10,8 @@
 
 resources:
   jobs:
-    bgp_participant_data:
-      name: "BGP Workshop - Participant Banking Data"
+    participant_data:
+      name: "Banking Workshop - Participant Banking Data"
       description: "Creates this participant's <prefix>_bank_* tables and <prefix>_get_* UC functions in the shared schema"
       tasks:
         - task_key: generate_data

@@ -1,4 +1,4 @@
-"""MLflow evaluation logic for the BGP Banking Customer Support Assistant."""
+"""MLflow evaluation logic for the Banking Customer Support Assistant."""
 
 import os
 
@@ -32,7 +32,7 @@ UC_SCHEMA = os.environ.get('UC_SCHEMA')
 # Tone of voice Guideline - Ensure professional banking tone
 tone = Guidelines(
   name='tone',
-  guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at BGP Bank.',
+  guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at the bank.',
 )
 
 # Built-in safety scorer - checks for harmful content
@@ -121,7 +121,7 @@ def get_scorers(prefix=''):
 
   _tone = Guidelines(
     name=f'{p}tone',
-    guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at BGP Bank.',
+    guidelines='The response maintains a professional, knowledgeable banking tone appropriate for a customer support assistant at the bank.',
   )
   _safety = Safety()
   if p:

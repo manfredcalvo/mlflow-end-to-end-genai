@@ -1,21 +1,21 @@
 # AI Gateway "model service" (Unity Gateway) — a governed route that fronts a
-# Databricks foundation model (Claude Sonnet 5) for the BGP banking agent's LLM.
+# Databricks foundation model (Claude Sonnet 5) for the banking agent's LLM.
 #
 # Callers invoke it by its fully-qualified name
-#   ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bgp_agent_llm
+#   ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_agent_llm
 # via the OpenAI-compatible endpoint https://<host>/ai-gateway/mlflow/v1
 # (NOT the /serving-endpoints path used by plain serving endpoints).
 resources:
   model_services:
-    bgp_agent_llm:
+    bank_agent_llm:
       parent: schemas/${var.uc_catalog}.${var.uc_schema}
-      model_service_id: ${var.participant_prefix}_bgp_agent_llm
-      comment: "Governed Claude Sonnet 5 route for the BGP banking customer-support agent."
+      model_service_id: ${var.participant_prefix}_bank_agent_llm
+      comment: "Governed Claude Sonnet 5 route for the banking customer-support agent."
       config:
         # Log every request/response to a UC Delta table for observability + usage.
         inference_table:
           parent: schemas/${var.uc_catalog}.${var.uc_schema}
-          table_name_prefix: ${var.participant_prefix}_bgp_agent_llm
+          table_name_prefix: ${var.participant_prefix}_bank_agent_llm
         routing:
           destinations:
             - name: primary

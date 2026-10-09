@@ -1,8 +1,8 @@
-# BGP MLflow 3 GenAI Workshop — Facilitation Guide
+# Banking MLflow 3 GenAI Workshop — Facilitation Guide
 
 ## Overview
 
-A hands-on workshop for 20 participants from BGP Bank (Panama) covering the full MLflow 3 GenAI quality lifecycle: tracing → evaluation → labeling → prompt optimization → monitoring. Each participant deploys their own banking customer support agent as a Databricks App, works through 6 notebooks with exercises, optimizes the agent's prompt, and redeploys.
+A hands-on workshop for 20 participants from the demo bank covering the full MLflow 3 GenAI quality lifecycle: tracing → evaluation → labeling → prompt optimization → monitoring. Each participant deploys their own banking customer support agent as a Databricks App, works through 6 notebooks with exercises, optimizes the agent's prompt, and redeploys.
 
 **Everything runs in Databricks.** Participants need only the Databricks CLI + a repo clone — no local Python environments, no `.env` files, no npm/uv builds. All setup runs as serverless jobs in the workspace, watched cell-by-cell in the Jobs UI.
 
@@ -28,17 +28,17 @@ Participants self-provision their own data at a **single shared schema**, namesp
 A workspace admin provisions one catalog + one schema and grants access:
 ```sql
 -- 1. Create the shared location (admin only)
-CREATE CATALOG IF NOT EXISTS workshop_bgp;
-CREATE SCHEMA  IF NOT EXISTS workshop_bgp.shared_data;
+CREATE CATALOG IF NOT EXISTS workshop_bank;
+CREATE SCHEMA  IF NOT EXISTS workshop_bank.shared_data;
 
 -- 2. Let every participant create THEIR OWN prefixed objects in it
-GRANT USE CATALOG ON CATALOG workshop_bgp TO `<each participant>`;
-GRANT USE SCHEMA, CREATE TABLE, CREATE FUNCTION ON SCHEMA workshop_bgp.shared_data TO `<each participant>`;
+GRANT USE CATALOG ON CATALOG workshop_bank TO `<each participant>`;
+GRANT USE SCHEMA, CREATE TABLE, CREATE FUNCTION ON SCHEMA workshop_bank.shared_data TO `<each participant>`;
 ```
 > **That's all the admin does.** The app's service principal needs no manual grants:
 > the app *declares* its UC access as DAB app resources (warehouse, experiment, and the
 > MLflow trace tables — all created before the app during `bundle deploy`), and the
-> `bgp_participant_data` job — running as the participant, who owns their
+> `participant_data` job — running as the participant, who owns their
 > `<prefix>_get_*` functions — grants the app SP `EXECUTE` on them right after creating them.
 
 ### Instructor
@@ -68,7 +68,7 @@ GRANT USE SCHEMA, CREATE TABLE, CREATE FUNCTION ON SCHEMA workshop_bgp.shared_da
 
 Each participant, from their clone (everything else is auto-derived from their username):
 ```bash
-databricks auth login --host https://<workspace>.cloud.databricks.com --profile bgp
+databricks auth login --host https://<workspace>.cloud.databricks.com --profile banking
 
 # 1. Create their app config, MLflow experiment, AI Gateway model service,
 #    and the self-service data job. No local builds — the built frontend
@@ -76,37 +76,37 @@ databricks auth login --host https://<workspace>.cloud.databricks.com --profile 
 #    NOTE: this first deploy reports an EXPECTED error on the Genie space
 #    (Genie validates that its tables exist, and the bank tables are only
 #    created by the data job below). The other resources deploy fine.
-databricks bundle deploy --target dev --profile bgp
+databricks bundle deploy --target dev --profile banking
 
 # 2. Create their <prefix>_bank_* tables + <prefix>_get_* UC functions
 #    (watch each notebook cell execute in the Jobs UI)
-databricks bundle run bgp_participant_data --target dev --profile bgp
+databricks bundle run participant_data --target dev --profile banking
 
 # 3. Deploy again — now the Genie space (example Genie agent over the
 #    participant's banking data) creates cleanly
-databricks bundle deploy --target dev --profile bgp
+databricks bundle deploy --target dev --profile banking
 
 # 4. Deploy + start their app
-databricks bundle run bgp_agent --target dev --profile bgp
+databricks bundle run bank_agent --target dev --profile banking
 ```
 
 The prompt, sample traces, and baseline evaluations are **part of the workshop itself**:
-importing the agent (notebook 1, step 1) registers the `<prefix>_bgp_support_prompt` if
+importing the agent (notebook 1, step 1) registers the `<prefix>_bank_support_prompt` if
 it doesn't exist (the app falls back to its built-in prompt until then), notebook 1's
 step 4 generates the 10 sample traces, and notebook 2's evaluate run attaches the judges'
 assessments that the later notebooks build on.
 
 What gets derived from their username (e.g. `jane.doe@x.com` → prefix `jane_doe`):
-their `<prefix>_bank_*` tables, `<prefix>_get_*` functions, `<prefix>_bgp_support_prompt`,
-`<prefix>_bgp_agent_llm` model service, `bgp-agent-<prefix>` app, and the
-`/Users/<you>/bgp_bank_workshop` MLflow experiment. Zero `--var` flags needed; the only
-common override is `--var app_name=bgp-agent-<shorter-name>` when a username is long
+their `<prefix>_bank_*` tables, `<prefix>_get_*` functions, `<prefix>_bank_support_prompt`,
+`<prefix>_bank_agent_llm` model service, `bank-agent-<prefix>` app, and the
+`/Users/<you>/banking_workshop` MLflow experiment. Zero `--var` flags needed; the only
+common override is `--var app_name=bank-agent-<shorter-name>` when a username is long
 or contains underscores (app names: lowercase/hyphens/≤30 chars).
 
 **Troubleshooting:**
 - "App won't start" → check app logs (Compute → Apps → `<app>` → logs)
 - Data job fails on `CREATE TABLE/FUNCTION` → the admin hasn't granted you create rights on the schema
-- Agent can't call functions → re-run `bundle run bgp_participant_data` (it (re)grants the app SP `EXECUTE` on your functions)
+- Agent can't call functions → re-run `bundle run participant_data` (it (re)grants the app SP `EXECUTE` on your functions)
 - No traces in MLflow → the app declares its trace-table access as DAB resources; check the app's Compute → resources list, and that `databricks --version` ≥ 1.19
 - Long/underscored username → pass `--var app_name=...`
 
@@ -117,7 +117,7 @@ Participants visit their app URL, ask banking questions, and submit thumbs up/do
 ### Phase 3: Notebook Labs (90 min)
 
 Participants open notebooks 0–6 **in the workspace** at
-`/Workspace/Users/<you>/bgp_bank_workshop/notebooks/` (synced by their deploy). Each
+`/Workspace/Users/<you>/banking_workshop/notebooks/` (synced by their deploy). Each
 notebook auto-configures itself from their username — the widgets only carry the shared
 catalog/schema/warehouse. **Run them in order**: notebook 1 generates the sample traces
 (and registers the prompt), notebook 2 attaches the judges' assessments — everything the
@@ -128,7 +128,7 @@ later notebooks depend on.
 Participants run notebook 6 (GEPA optimization) and register the improved prompt with the
 `production` alias. To make the live app pick it up, one command:
 ```bash
-databricks bundle run bgp_agent --target dev --profile bgp
+databricks bundle run bank_agent --target dev --profile banking
 ```
 Then ask the same question in the app and compare.
 
@@ -147,7 +147,7 @@ At the end of the workshop, the instructor demonstrates the CI/CD story:
 |-------|----------|
 | App won't start | Check the app logs (Compute → Apps → your app), verify `databricks --version` ≥ 1.19.0 |
 | No traces in MLflow | The app's trace-table access is a DAB app resource — check Compute → Apps → your app → resources |
-| UC function error | Re-run `bundle run bgp_participant_data` — it (re)grants the app SP `EXECUTE` on your functions |
+| UC function error | Re-run `bundle run participant_data` — it (re)grants the app SP `EXECUTE` on your functions |
 | Scorer collision | Scorers are namespaced with your username prefix automatically |
 | LLM rate limits | If 20 participants hit rate limits, stagger the jobs or use provisioned throughput |
 | DAB validation fails | Run `databricks bundle validate --target dev` |
@@ -162,9 +162,9 @@ At the end of the workshop, the instructor demonstrates the CI/CD story:
 | UC functions (job notebook) | `workshop/create_uc_functions.py` |
 | Sample questions (used in Notebook 1) | `workshop/banking_questions.jsonl` |
 | Notebooks 0-6 (repo) | `notebooks/` |
-| Notebooks 0-6 (in workspace after deploy) | `/Workspace/Users/<you>/bgp_bank_workshop/notebooks/` |
-| Example Genie agent (space resource) | `resources/bgp_genie_space.yml` |
-| Embedded AI/BI dashboard (resource + Analytics tab) | `resources/bgp_dashboard.yml`, `app/client/src/components/analytics/AnalyticsTab.tsx` |
+| Notebooks 0-6 (in workspace after deploy) | `/Workspace/Users/<you>/banking_workshop/notebooks/` |
+| Example Genie agent (space resource) | `resources/banking_genie_space.yml` |
+| Embedded AI/BI dashboard (resource + Analytics tab) | `resources/dashboard.yml`, `app/client/src/components/analytics/AnalyticsTab.tsx` |
 | Agent code | `mlflow_demo/agent/agent.py` |
 | Banking prompts | `mlflow_demo/agent/prompts.py` |
 | Banking scorers | `mlflow_demo/evaluation/evaluator.py` |

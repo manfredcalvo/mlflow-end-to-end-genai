@@ -12,35 +12,35 @@ def sanitize_prefix(user: str) -> str:
 
 
 def get_dab_experiment_name(user_email: str) -> str:
-  """The UNMANGLED experiment name from resources/bgp_experiment.yml.
+  """The UNMANGLED experiment name from resources/experiment.yml.
 
   NOTE: dev-mode (`--target dev`) deploys rename it to
-  '/Users/<you>/[dev <prefix>] bgp_bank_workshop', so do NOT look it up by this
+  '/Users/<you>/[dev <prefix>] banking_workshop', so do NOT look it up by this
   exact string — use setup_databricks_notebook_env()'s search-based resolution,
   or pass the exact name from the DAB (${resources.experiments...}) where the
   DAB can inject it (app env, job parameters).
   """
-  return f'/Users/{user_email}/bgp_bank_workshop'
+  return f'/Users/{user_email}/banking_workshop'
 
 
 # Shared-workshop defaults surfaced as notebook widgets. The instructor sets these
 # once per workspace; participants can override them per-run in the widget bar.
 WIDGET_DEFAULTS = {
-  'catalog': 'workshop_bgp',
+  'catalog': 'workshop_bank',
   'schema': 'shared_data',
   'warehouse': 'd9ce200bcd25d8a2',
 }
 
 
-def _find_user_bgp_experiment(mlflow, user_email):
+def _find_user_workshop_experiment(mlflow, user_email):
   """Find the bundle-created experiment for THIS user, robust to DAB name mangling.
 
   Dev-mode deploys rename the experiment (e.g. '/Users/<you>/[dev <prefix>]
-  bgp_bank_workshop'), so an exact-name lookup fails. Search instead and take the
+  banking_workshop'), so an exact-name lookup fails. Search instead and take the
   active experiment whose path starts with /Users/<you>/.
   """
   exps = mlflow.search_experiments(
-      filter_string="name LIKE '%bgp_bank_workshop'", max_results=100
+      filter_string="name LIKE '%banking_workshop'", max_results=100
   )
   mine = [
       e for e in exps
@@ -90,15 +90,15 @@ def setup_databricks_notebook_env():
     if exp is None:
       raise RuntimeError(f"MLflow experiment '{explicit_experiment}' not found.")
   else:
-    exp = _find_user_bgp_experiment(mlflow, user)
+    exp = _find_user_workshop_experiment(mlflow, user)
     if exp is None:
       raise RuntimeError(
-          f'No MLflow experiment matching /Users/{user}/…bgp_bank_workshop found — '
+          f'No MLflow experiment matching /Users/{user}/…banking_workshop found — '
           'run `databricks bundle deploy` first.'
       )
 
   # Everything else derives from catalog/schema/prefix — identical to the env the
-  # DAB sets for the app (resources/bgp_agent_app.yml), so notebooks and the app
+  # DAB sets for the app (resources/bank_agent_app.yml), so notebooks and the app
   # resolve the same UC objects and experiment.
   os.environ.update({
     'MLFLOW_TRACKING_URI': 'databricks',
@@ -106,11 +106,11 @@ def setup_databricks_notebook_env():
     'UC_SCHEMA': schema,
     'UC_TOOL_SCHEMA': f'{catalog}.{schema}',
     'UC_TOOL_PREFIX': prefix,
-    'PROMPT_NAME': f'{prefix}_bgp_support_prompt',
+    'PROMPT_NAME': f'{prefix}_bank_support_prompt',
     'PROMPT_ALIAS': 'production',
     'SCORER_PREFIX': prefix,
     'LLM_MODEL': 'databricks-claude-sonnet-5',  # informational; the agent uses LLM_MODEL_SERVICE
-    'LLM_MODEL_SERVICE': f'{catalog}.{schema}.{prefix}_bgp_agent_llm',
+    'LLM_MODEL_SERVICE': f'{catalog}.{schema}.{prefix}_bank_agent_llm',
     'MLFLOW_TRACING_SQL_WAREHOUSE_ID': warehouse,
     'MLFLOW_ENABLE_ASYNC_TRACE_LOGGING': 'false',
     'MLFLOW_TRACE_EXTRACT_ATTACHMENTS': 'false',
@@ -150,7 +150,7 @@ def load_or_register_prompt(catalog, schema, prompt_name, fallback_template,
       prompt = mlflow.genai.register_prompt(
           name=full,
           template=fallback_template,
-          commit_message='Initial BGP banking customer-support system prompt',
+          commit_message='Initial banking customer-support system prompt',
       )
       mlflow.genai.set_prompt_alias(name=full, alias='production', version=prompt.version)
       # Tag the experiment so the MLflow UI links prompts for it (best-effort).

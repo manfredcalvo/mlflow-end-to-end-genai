@@ -1,11 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Create BGP banking UC functions
+# MAGIC # Create banking UC functions
 # MAGIC
 # MAGIC Creates this participant's 7 `<prefix>_get_*` SQL UC functions, each reading
 # MAGIC the matching `<prefix>_bank_*` table. Run after `generate_banking_data`.
 # MAGIC Driven by the `catalog`, `schema`, and `prefix` widgets (set by the
-# MAGIC `bgp_participant_data` job); blank `prefix` is derived from `current_user()`.
+# MAGIC `participant_data` job); blank `prefix` is derived from `current_user()`.
 
 # COMMAND ----------
 
@@ -21,7 +21,7 @@ from pyspark.sql import SparkSession
 
 from mlflow_demo.utils.mlflow_helpers import sanitize_prefix
 
-dbutils.widgets.text("catalog", "workshop_bgp", "UC catalog")
+dbutils.widgets.text("catalog", "workshop_bank", "UC catalog")
 dbutils.widgets.text("schema", "shared_data", "UC schema")
 dbutils.widgets.text("prefix", "", "Per-participant prefix (blank = current_user)")
 dbutils.widgets.text("app_name", "", "Databricks App name (its service principal gets EXECUTE on the functions)")
@@ -238,7 +238,7 @@ FUNCTIONS_SQL = [
     # 7. Branch info
     """
     CREATE OR REPLACE FUNCTION {full_schema}.get_branch_info(
-      p_city STRING COMMENT 'City name (e.g., Panama City, Colon, David). NULL returns all branches.'
+      p_city STRING COMMENT 'City name (e.g., Springfield, Fairview, Riverton). NULL returns all branches.'
     )
     RETURNS STRING
     LANGUAGE SQL
@@ -298,9 +298,9 @@ if result and result[0][0]:
 else:
     print("  WARNING: get_customer_profile returned no data")
 
-result = spark.sql(f"SELECT {full_schema}.{p}get_branch_info('Panama City')").collect()
+result = spark.sql(f"SELECT {full_schema}.{p}get_branch_info('Springfield')").collect()
 if result and result[0][0]:
-    print(f"  {p}get_branch_info('Panama City') returned data")
+    print(f"  {p}get_branch_info('Springfield') returned data")
 
 # COMMAND ----------
 
