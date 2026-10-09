@@ -26,11 +26,9 @@ jobs:
       - run:
           name: Install Databricks CLI (>= 1.19 for model_services)
           command: |
-            curl -fsSL https://raw.githubusercontent.com/databricks/cli/main/install.sh | sh
-            # install.sh drops the binary in ~/bin unless a system dir is writable;
-            # BASH_ENV persists the PATH addition to every later step.
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$BASH_ENV"
-            export PATH="$HOME/bin:$PATH"
+            # Canonical installer (databricks/setup-cli); sudo writes to
+            # /usr/local/bin, which is on PATH — no PATH setup needed.
+            curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sudo sh
             databricks --version
 
       - run:

@@ -25,12 +25,9 @@ jobs:
 
       - name: Install Databricks CLI (>= 1.19 for model_services)
         run: |
-          curl -fsSL https://raw.githubusercontent.com/databricks/cli/main/install.sh | sh
-          # install.sh drops the binary in ~/bin unless a system dir is writable;
-          # GITHUB_PATH persists the addition to every later step (same mechanism
-          # as BASH_ENV in the CircleCI pipeline).
-          echo "$HOME/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/bin:$PATH"
+          # Canonical installer (databricks/setup-cli); sudo writes to
+          # /usr/local/bin, which is on PATH — no PATH setup needed.
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sudo sh
           databricks --version
 
       - name: Configure Databricks auth
