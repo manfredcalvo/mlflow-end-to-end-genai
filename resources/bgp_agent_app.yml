@@ -45,6 +45,10 @@ resources:
             value: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bgp_agent_llm
           - name: DEMO_CUSTOMER_IDS
             value: ${var.demo_customer_ids}
+          # The bundle-created AI/BI dashboard the app's Analytics tab embeds
+          # (iframe to /embed/dashboardsv3/<id>, viewer's workspace session).
+          - name: DASHBOARD_ID
+            value: ${resources.dashboards.bgp_portfolio_dashboard.id}
           - name: MLFLOW_ENABLE_ASYNC_TRACE_LOGGING
             value: "false"
           - name: MLFLOW_TRACE_EXTRACT_ATTACHMENTS

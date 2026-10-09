@@ -146,6 +146,27 @@ async def experiment():
   )
 
 
+@app.get(f'{API_PREFIX}/dashboard')
+async def dashboard_embed():
+  """Embed info for the bundle-created AI/BI portfolio dashboard.
+
+  The frontend's Analytics tab iframes the returned embed_url; it renders with
+  the viewer's existing workspace session (app users are already
+  Databricks-authenticated).
+  """
+  databricks_host = ensure_https_protocol(os.getenv('DATABRICKS_HOST'))
+  dashboard_id = os.getenv('DASHBOARD_ID', '')
+
+  return {
+      'dashboard_id': dashboard_id,
+      'embed_url': (
+          f'{databricks_host}/embed/dashboardsv3/{dashboard_id}'
+          if dashboard_id
+          else None
+      ),
+  }
+
+
 @app.get(f'{API_PREFIX}/health')
 async def health_check():
   """Health check endpoint for monitoring app status."""

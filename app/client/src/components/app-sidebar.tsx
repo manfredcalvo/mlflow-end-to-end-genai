@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Headphones } from "lucide-react";
+import { BarChart3, Bot, Headphones } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -55,6 +55,14 @@ export function AppSidebar({
                   <Link to="/">
                     <Headphones className="size-4" />
                     <span>Chat</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/analytics">
+                    <BarChart3 className="size-4" />
+                    <span>Analytics</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

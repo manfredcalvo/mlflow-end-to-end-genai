@@ -1,0 +1,216 @@
+# BGP Workshop — example AI/BI (Lakeview) dashboard, embedded in the app.
+#
+# A banking portfolio overview over the participant's <prefix>_bank_* tables:
+# 3 KPIs (total customers, active accounts, active loan principal),
+# transactions by category, customers by tier, active loan volume by type,
+# and a top-10 accounts table.
+#
+# serialized_dashboard is INLINE bundle config on purpose: ${var...}
+# interpolation applies to inline YAML (it does NOT apply to file_path
+# JSON content), which is what makes the per-participant prefixed table
+# names work. Every dataset query was tested against the real tables.
+#
+# The app embeds it via iframe (resources/bgp_agent_app.yml passes the
+# dashboard id as the DASHBOARD_ID env var from
+# ${resources.dashboards.bgp_portfolio_dashboard.id}); the frontend's
+# Analytics tab renders {host}/embed/dashboardsv3/<id> with the viewer's
+# workspace session.
+
+resources:
+  dashboards:
+    bgp_portfolio_dashboard:
+      display_name: "BGP Bank Portfolio Dashboard — ${var.participant_prefix}"
+      parent_path: ${workspace.file_path}
+      warehouse_id: ${var.warehouse_id}
+      embed_credentials: true
+      serialized_dashboard:
+        datasets:
+          - name: kpi_summary
+            displayName: KPI Summary
+            queryLines:
+              - "SELECT "
+              - "  (SELECT COUNT(*) FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_customers) AS total_customers, "
+              - "  (SELECT COUNT(*) FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_accounts WHERE status = 'Active') AS active_accounts, "
+              - "  (SELECT ROUND(COALESCE(SUM(principal), 0), 2) FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_loans WHERE status = 'Active') AS active_loan_principal "
+          - name: customers_by_tier
+            displayName: Customers by Tier
+            queryLines:
+              - "SELECT tier, COUNT(*) AS customer_count "
+              - "FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_customers "
+              - "GROUP BY tier "
+          - name: txn_by_category
+            displayName: Transactions by Category
+            queryLines:
+              - "SELECT category, COUNT(*) AS txn_count, ROUND(COALESCE(SUM(ABS(amount)), 0), 2) AS txn_volume "
+              - "FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_transactions "
+              - "GROUP BY category ORDER BY txn_count DESC LIMIT 8 "
+          - name: loans_by_type
+            displayName: Active Loans by Type
+            queryLines:
+              - "SELECT loan_type, COUNT(*) AS loan_count, ROUND(SUM(principal), 2) AS total_principal "
+              - "FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_loans "
+              - "WHERE status = 'Active' GROUP BY loan_type ORDER BY total_principal DESC "
+          - name: top_accounts
+            displayName: Top Active Accounts
+            queryLines:
+              - "SELECT account_id, customer_id, account_type, ROUND(balance, 2) AS balance "
+              - "FROM ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_accounts "
+              - "WHERE status = 'Active' ORDER BY balance DESC LIMIT 10 "
+        pages:
+          - name: overview
+            displayName: BGP Bank Overview
+            pageType: PAGE_TYPE_CANVAS
+            layoutVersion: GRID_V1
+            layout:
+              - widget:
+                  name: title
+                  multilineTextboxSpec:
+                    lines: ["## BGP Bank — Portfolio Overview"]
+                position: {x: 0, y: 0, width: 12, height: 1}
+              - widget:
+                  name: subtitle
+                  multilineTextboxSpec:
+                    lines: ["Synthetic demo portfolio analytics, deployed with the participant's Databricks bundle."]
+                position: {x: 0, y: 1, width: 12, height: 1}
+              - widget:
+                  name: total-customers
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: kpi_summary
+                        fields:
+                          - {name: total_customers, expression: "`total_customers`"}
+                        disaggregated: true
+                  spec:
+                    version: 2
+                    widgetType: counter
+                    encodings:
+                      value: {fieldName: total_customers, displayName: Total Customers}
+                    frame: {title: Total Customers, showTitle: true}
+                position: {x: 0, y: 2, width: 4, height: 4}
+              - widget:
+                  name: active-accounts
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: kpi_summary
+                        fields:
+                          - {name: active_accounts, expression: "`active_accounts`"}
+                        disaggregated: true
+                  spec:
+                    version: 2
+                    widgetType: counter
+                    encodings:
+                      value: {fieldName: active_accounts, displayName: Active Accounts}
+                    frame: {title: Active Accounts, showTitle: true}
+                position: {x: 4, y: 2, width: 4, height: 4}
+              - widget:
+                  name: active-loan-principal
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: kpi_summary
+                        fields:
+                          - {name: active_loan_principal, expression: "`active_loan_principal`"}
+                        disaggregated: true
+                  spec:
+                    version: 2
+                    widgetType: counter
+                    encodings:
+                      value:
+                        fieldName: active_loan_principal
+                        displayName: Active Loan Principal
+                        format: {type: number-currency, currencyCode: USD, abbreviation: compact, decimalPlaces: {type: max, places: 2}}
+                    frame: {title: Active Loan Principal, showTitle: true}
+                position: {x: 8, y: 2, width: 4, height: 4}
+              - widget:
+                  name: where-the-money-is
+                  multilineTextboxSpec:
+                    lines: ["### Where the money is"]
+                position: {x: 0, y: 6, width: 12, height: 1}
+              - widget:
+                  name: txn-by-category
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: txn_by_category
+                        fields:
+                          - {name: category, expression: "`category`"}
+                          - {name: txn_count, expression: "`txn_count`"}
+                        disaggregated: true
+                  spec:
+                    version: 3
+                    widgetType: bar
+                    encodings:
+                      x: {fieldName: category, scale: {type: categorical}}
+                      y: {fieldName: txn_count, scale: {type: quantitative}, displayName: Transactions}
+                    frame: {title: "Transactions by category (top 8)", showTitle: true}
+                position: {x: 0, y: 7, width: 6, height: 5}
+              - widget:
+                  name: customers-by-tier
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: customers_by_tier
+                        fields:
+                          - {name: tier, expression: "`tier`"}
+                          - {name: customer_count, expression: "`customer_count`"}
+                        disaggregated: true
+                  spec:
+                    version: 3
+                    widgetType: pie
+                    encodings:
+                      angle: {fieldName: customer_count, scale: {type: quantitative}}
+                      color: {fieldName: tier, scale: {type: categorical}}
+                    frame: {title: Customers by tier, showTitle: true}
+                position: {x: 6, y: 7, width: 6, height: 5}
+              - widget:
+                  name: loans-and-top-accounts
+                  multilineTextboxSpec:
+                    lines: ["### Loans & top accounts"]
+                position: {x: 0, y: 12, width: 12, height: 1}
+              - widget:
+                  name: loans-by-type
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: loans_by_type
+                        fields:
+                          - {name: loan_type, expression: "`loan_type`"}
+                          - {name: total_principal, expression: "`total_principal`"}
+                        disaggregated: true
+                  spec:
+                    version: 3
+                    widgetType: bar
+                    encodings:
+                      x: {fieldName: loan_type, scale: {type: categorical}}
+                      y:
+                        fieldName: total_principal
+                        scale: {type: quantitative}
+                        displayName: "Principal (USD)"
+                        format: {type: number-currency, currencyCode: USD, abbreviation: compact, decimalPlaces: {type: max, places: 2}}
+                    frame: {title: Active loan volume by type, showTitle: true}
+                position: {x: 0, y: 13, width: 6, height: 5}
+              - widget:
+                  name: top-accounts-table
+                  queries:
+                    - name: main_query
+                      query:
+                        datasetName: top_accounts
+                        fields:
+                          - {name: account_id, expression: "`account_id`"}
+                          - {name: customer_id, expression: "`customer_id`"}
+                          - {name: account_type, expression: "`account_type`"}
+                          - {name: balance, expression: "`balance`"}
+                        disaggregated: true
+                  spec:
+                    version: 2
+                    widgetType: table
+                    encodings:
+                      columns:
+                        - {fieldName: account_id, displayName: Account}
+                        - {fieldName: customer_id, displayName: Customer}
+                        - {fieldName: account_type, displayName: Type}
+                        - {fieldName: balance, displayName: "Balance (USD)"}
+                    frame: {title: Top 10 active accounts by balance, showTitle: true}
+                position: {x: 6, y: 13, width: 6, height: 5}

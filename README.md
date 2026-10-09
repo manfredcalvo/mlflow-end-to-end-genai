@@ -83,6 +83,8 @@ Zero `--var` flags needed (override `--var app_name=...` only for long/underscor
 
 **Example Genie agent** (`resources/bgp_genie_space.yml`): a Genie space over the participant's `<prefix>_bank_*` tables — natural-language banking analytics with guided instructions and example SQL, created by the second deploy and usable in the Genie UI.
 
+**Embedded AI/BI dashboard** (`resources/bgp_dashboard.yml`): a Lakeview portfolio dashboard over the same prefixed tables (KPIs, transactions by category, customers by tier, loan volume, top accounts), created by the bundle and **embedded in the app** — the app's Analytics tab iframes `{host}/embed/dashboardsv3/{dashboard_id}` with the viewer's workspace session. The dashboard id reaches the app through the DAB resource reference (`DASHBOARD_ID` env); the frontend fetches it via `/api/dashboard`. Requires the workspace's allowed-embed-domains setting to include the app domain.
+
 ### How the app gets its config
 
 The app's command and environment live in the DAB app resource (`resources/bgp_agent_app.yml`), not a static `app.yaml`. Notably, the MLflow experiment id/name are sourced from the **experiment resource reference** (`${resources.experiments.bgp_workshop_experiment.id}` / `.name`), so they are never hardcoded and always track the experiment the bundle created.

@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TelcoAssistant } from "@/components/telco/TelcoAssistant";
+import { AnalyticsTab } from "@/components/analytics/AnalyticsTab";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,14 @@ export function Chat() {
               element={
                 <div className="w-full h-full">
                   <TelcoAssistant />
+                </div>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <div className="w-full h-full">
+                  <AnalyticsTab />
                 </div>
               }
             />

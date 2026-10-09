@@ -164,6 +164,7 @@ At the end of the workshop, the instructor demonstrates the CI/CD story:
 | Notebooks 0-6 (repo) | `notebooks/` |
 | Notebooks 0-6 (in workspace after deploy) | `/Workspace/Users/<you>/bgp_bank_workshop/notebooks/` |
 | Example Genie agent (space resource) | `resources/bgp_genie_space.yml` |
+| Embedded AI/BI dashboard (resource + Analytics tab) | `resources/bgp_dashboard.yml`, `app/client/src/components/analytics/AnalyticsTab.tsx` |
 | Agent code | `mlflow_demo/agent/agent.py` |
 | Banking prompts | `mlflow_demo/agent/prompts.py` |
 | Banking scorers | `mlflow_demo/evaluation/evaluator.py` |
