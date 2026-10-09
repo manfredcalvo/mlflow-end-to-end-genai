@@ -138,7 +138,7 @@ At the end of the workshop, the instructor demonstrates the CI/CD story:
 
 1. **DAB definition** (`databricks.yml` + `resources/*.yml`): the app, model service, experiment, and jobs are all declarative — no shell scripts, no sed, no manual substitution.
 2. **Workshop flow** (what participants just did): `bundle deploy` + `bundle run <job>` from a clone, everything derived from the username.
-3. **Production flow**: push to `main` triggers `.github/workflows/deploy.yml`, which builds the frontend and runs the same `bundle deploy/run --target prod` with secrets.
+3. **Production flow**: push to `main` triggers `.github/workflows/deploy.yml`, which builds the frontend and runs the same `bundle deploy/run --target prod` with secrets. An equivalent **CircleCI** example lives in `.circleci/config.yml` — identical steps and variables, showing the bundle is CI-provider-agnostic (a good customer talking point).
 4. Key message: "Once your DAB is set up, CI/CD is just `databricks bundle deploy` — no shell scripts, no sed, no manual steps"
 
 ## Troubleshooting Guide

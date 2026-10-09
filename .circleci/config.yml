@@ -1,0 +1,73 @@
+version: 2.1
+
+# Production deploy path — the CircleCI counterpart of .github/workflows/deploy.yml.
+# Kept as a customer-facing example that the same Databricks Asset Bundle works
+# with any CI provider: identical steps, identical secrets.
+#
+# Configure these in CircleCI: Project Settings -> Environment Variables:
+#   DATABRICKS_HOST     workspace URL (https://<workspace>.cloud.databricks.com)
+#   DATABRICKS_TOKEN    a Databricks access token with deploy rights
+#   SQL_WAREHOUSE_ID    SQL warehouse for MLflow tracing
+#   NOTEBOOK_ROOT       workspace path of the synced notebooks (prod)
+#
+# Workshop participants do NOT use this — each participant self-deploys from
+# their clone (see workshop/README.md). This pipeline deploys the shared prod
+# app on push to main. The frontend is built fresh here (it also verifies the
+# app compiles); the committed app/client/build/ is the fallback for CLI-only
+# deploys. requirements.txt is committed (source of truth) — no generation steps.
+
+jobs:
+  deploy:
+    docker:
+      - image: cimg/node:18.20
+    steps:
+      - checkout
+
+      - run:
+          name: Install Databricks CLI (>= 1.19 for model_services)
+          command: |
+            curl -fsSL https://raw.githubusercontent.com/databricks/cli/main/install.sh | sh
+            # install.sh drops the binary in ~/bin unless a system dir is writable;
+            # BASH_ENV persists the PATH addition to every later step.
+            echo 'export PATH="$HOME/bin:$PATH"' >> "$BASH_ENV"
+            export PATH="$HOME/bin:$PATH"
+            databricks --version
+
+      - run:
+          name: Configure Databricks auth
+          command: |
+            mkdir -p ~/.databricks
+            printf 'host = %s\ntoken = %s\n' "$DATABRICKS_HOST" "$DATABRICKS_TOKEN" > ~/.databrickscfg
+
+      - run:
+          name: Build frontend
+          command: |
+            cd app/client
+            npm install
+            npm run build
+
+      - run:
+          name: Validate bundle
+          command: databricks bundle validate --target prod
+
+      - run:
+          name: Deploy bundle and app
+          command: |
+            # deploy syncs source + creates resources (app config, experiment,
+            # model service, jobs); run deploys/starts the app from the DAB
+            # config block. The MLflow experiment id/name come from the
+            # experiment resource reference, so nothing is hardcoded.
+            databricks bundle deploy --target prod --auto-approve \
+              --var warehouse_id="$SQL_WAREHOUSE_ID" \
+              --var notebook_root="$NOTEBOOK_ROOT"
+            databricks bundle run bgp_agent --target prod \
+              --var warehouse_id="$SQL_WAREHOUSE_ID" \
+              --var notebook_root="$NOTEBOOK_ROOT"
+
+workflows:
+  deploy:
+    jobs:
+      - deploy:
+          filters:
+            branches:
+              only: main
