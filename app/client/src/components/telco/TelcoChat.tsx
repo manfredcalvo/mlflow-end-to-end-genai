@@ -138,7 +138,7 @@ export function TelcoChat({ onActiveMessageChange }: TelcoChatProps) {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Sparkles className="h-4 w-4 text-primary" />
-              Telco Support Agent
+              Banking Support Agent
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
               Powered by MLflow tracing — every response is observable in
@@ -171,7 +171,7 @@ export function TelcoChat({ onActiveMessageChange }: TelcoChatProps) {
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about a customer's account, billing, or device…"
+                placeholder="Ask about a customer's accounts, transactions, loans, cards, or branches…"
                 rows={2}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -271,9 +271,9 @@ function EmptyChatState() {
         Ask the support agent anything
       </p>
       <p className="text-xs max-w-md mx-auto">
-        Try: "What's my current bill?", "Why is my data slow?", or "Compare
-        plans for me." Watch the right panel to see how the agent reasons,
-        captured live by MLflow.
+        Try: "What's the balance on my checking account?", "Show my recent
+        transactions", or "What loans do I have?" Watch the right panel to see
+        how the agent reasons, captured live by MLflow.
       </p>
     </div>
   );
