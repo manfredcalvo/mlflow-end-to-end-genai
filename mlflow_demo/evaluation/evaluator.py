@@ -27,6 +27,13 @@ FIX_DATASET_NAME = 'low_accuracy'
 UC_CATALOG = os.environ.get('UC_CATALOG')
 UC_SCHEMA = os.environ.get('UC_SCHEMA')
 
+# The LLM that runs the custom judges (accuracy/relevance/actionability/
+# groundedness). An explicit model avoids the Databricks default managed judge,
+# whose output has intermittently arrived wrapped in markdown code fences
+# (which breaks MLflow's JSON parsing -> "Invalid JSON response from
+# Databricks judge"). Databricks-backed models don't support inference_params.
+JUDGE_MODEL = os.getenv('JUDGE_MODEL', 'databricks:/databricks-claude-sonnet-4-6')
+
 # --- Built-in Scorers ---
 
 # Tone of voice Guideline - Ensure professional banking tone
@@ -45,6 +52,7 @@ relevance_to_query = RelevanceToQuery()
 
 accuracy = make_judge(
   name='accuracy',
+  model=JUDGE_MODEL,
   instructions="""Evaluate whether the agent's response correctly references factual information from the execution trace.
 
   Analyze the full execution {{ trace }} to find tool call results, then assess the response against these rules:
@@ -62,6 +70,7 @@ accuracy = make_judge(
 
 relevance = make_judge(
   name='relevance',
+  model=JUDGE_MODEL,
   instructions="""Evaluate whether the agent's response directly addresses the user's question.
 
   User's request: {{ inputs }}
@@ -79,6 +88,7 @@ relevance = make_judge(
 
 actionability = make_judge(
   name='actionability',
+  model=JUDGE_MODEL,
   instructions="""Evaluate whether the agent's response provides actionable guidance for the customer.
 
   Agent's response: {{ outputs }}
@@ -95,6 +105,7 @@ actionability = make_judge(
 
 response_is_grounded = make_judge(
   name='response_is_grounded',
+  model=JUDGE_MODEL,
   instructions="""Evaluate whether the agent's response is grounded in the data retrieved by tool calls.
 
   Analyze the full execution {{ trace }} to find tool call results, then assess whether:
@@ -132,18 +143,22 @@ def get_scorers(prefix=''):
 
   _accuracy = make_judge(
     name=f'{p}accuracy',
+    model=JUDGE_MODEL,
     instructions=accuracy.instructions,
   )
   _relevance = make_judge(
     name=f'{p}relevance',
+    model=JUDGE_MODEL,
     instructions=relevance.instructions,
   )
   _actionability = make_judge(
     name=f'{p}actionability',
+    model=JUDGE_MODEL,
     instructions=actionability.instructions,
   )
   _response_is_grounded = make_judge(
     name=f'{p}response_is_grounded',
+    model=JUDGE_MODEL,
     instructions=response_is_grounded.instructions,
   )
 
