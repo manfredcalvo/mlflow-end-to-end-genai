@@ -40,9 +40,14 @@ resources:
           - name: SCORER_PREFIX
             value: ${var.participant_prefix}
           # Route the agent LLM through the AI Gateway model service (Claude
-          # Sonnet 5), invoked by its fully-qualified name via /ai-gateway/mlflow/v1.
+          # Sonnet 5), invoked by its fully-qualified name via the
+          # OpenAI-native gateway path ({host}/ai-gateway/openai/v1).
           - name: LLM_MODEL_SERVICE
             value: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_agent_llm
+          # Default customer context for the agent's tool calls (the app UI
+          # passes its own per-request customer_id; this covers anything else).
+          - name: DEMO_CUSTOMER_ID
+            value: "CUST-00015"
           - name: DEMO_CUSTOMER_IDS
             value: ${var.demo_customer_ids}
           # The bundle-created AI/BI dashboard the app's Analytics tab embeds
@@ -56,7 +61,8 @@ resources:
           - name: ENV
             value: prod
           # Telco (banking) chat agent — same experiment as above, from the
-          # DAB resource (not hardcoded). TELCO_MODEL defaults in code.
+          # DAB resource (not hardcoded). The model defaults in code
+          # (LLM_MODEL_SERVICE gateway, LLM_MODEL fallback).
           - name: TELCO_MLFLOW_EXPERIMENT_ID
             value: ${resources.experiments.banking_workshop_experiment.id}
           - name: TELCO_MLFLOW_EXPERIMENT_PATH
@@ -67,15 +73,18 @@ resources:
       # experiment resource, so it is never hardcoded.
       #
       # UC access, declaratively:
-      #   - DECLARE here: warehouse, experiment, and the MLflow trace tables.
-      #     The experiment resource sets uc_trace_location.table_prefix =
-      #     <participant_prefix>_traces, so the tables are named
-      #     <catalog>.<schema>.<prefix>_traces_otel_* / _trace_metadata /
-      #     _trace_unified — fully derivable from the bundle variables (no
-      #     workspace-id or experiment-id in the names). The DAB creates the
-      #     experiment + its tables BEFORE the app during deploy, so they exist
-      #     when these resources attach. Attaching any UC securable also
-      #     auto-grants the parent USE CATALOG / USE SCHEMA.
+      #   - DECLARE here: warehouse, experiment, the MLflow trace tables, and
+      #     EXECUTE on the AI-Gateway model service the agent's LLM routes
+      #     through (securable_type MODEL_SERVICE — not in older CLI schema
+      #     enums, but the API accepts it). The experiment resource sets
+      #     uc_trace_location.table_prefix = <participant_prefix>_traces, so
+      #     the tables are named <catalog>.<schema>.<prefix>_traces_otel_* /
+      #     _trace_metadata / _trace_unified — fully derivable from the bundle
+      #     variables (no workspace-id or experiment-id in the names). The DAB
+      #     creates the experiment + model service + tables BEFORE the app
+      #     during deploy, so they exist when these resources attach.
+      #     Attaching any UC securable also auto-grants the parent USE CATALOG /
+      #     USE SCHEMA.
       #   - GRANTED BY THE DATA JOB: EXECUTE on the participant's 7
       #     <prefix>_get_* banking functions (create_uc_functions.py grants the
       #     app's SP right after creating them — functions can't be app resources
@@ -93,6 +102,13 @@ resources:
           experiment:
             experiment_id: ${resources.experiments.banking_workshop_experiment.id}
             permission: CAN_EDIT
+        # The app's SP calls the AI-Gateway model service directly (the unified
+        # agent routes the LLM through the participant's governed model service).
+        - name: model
+          uc_securable:
+            securable_type: MODEL_SERVICE
+            securable_full_name: ${var.uc_catalog}.${var.uc_schema}.${var.participant_prefix}_bank_agent_llm
+            permission: EXECUTE
         - name: trace-spans-write
           uc_securable:
             securable_type: TABLE
