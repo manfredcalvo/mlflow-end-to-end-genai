@@ -99,9 +99,14 @@ async def _traced_collect(
   async for event in AGENT.predict_stream(message, customer_id, conversation_history):
     collected.append(event)
 
+  # get_ACTIVE_trace_id (context-scoped, reads the current span's trace), NOT
+  # get_last_active_trace_id — the latter is process-global and returns
+  # whichever trace most recently STARTED, so under concurrent requests one
+  # chat's completion event (and its feedback) could be attributed to another
+  # chat's trace.
   trace_id = None
   try:
-    trace_id = mlflow.get_last_active_trace_id()
+    trace_id = mlflow.get_active_trace_id()
   except Exception:
     pass
 
