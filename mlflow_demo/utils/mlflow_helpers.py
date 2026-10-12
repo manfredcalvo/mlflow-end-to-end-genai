@@ -248,7 +248,10 @@ def ensure_https_protocol(host: str | None) -> str:
 
 
 def generate_trace_links(trace_id: str = None, print_urls: bool = True) -> tuple[str, str]:
-  """Generate MLflow UI links for viewing traces."""
+  """Generate MLflow UI links for viewing traces. Always returns a
+  (traces_url, specific_trace_url) tuple - (None, None) when the link inputs
+  are unavailable (e.g. job-run notebooks without a browser hostname), so
+  callers can safely unpack `_, url = ...`."""
   import mlflow
 
   if mlflow.utils.databricks_utils.is_in_databricks_notebook():
@@ -260,7 +263,7 @@ def generate_trace_links(trace_id: str = None, print_urls: bool = True) -> tuple
 
   if not databricks_host or not experiment_id:
     print('⚠️ Missing DATABRICKS_HOST or MLFLOW_EXPERIMENT_ID - cannot generate links')
-    return
+    return None, None
 
   # General experiment traces view
   traces_url = f'{databricks_host}/ml/experiments/{experiment_id}?compareRunsMode=TRACES'
