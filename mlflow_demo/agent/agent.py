@@ -30,13 +30,14 @@ from typing import Any, AsyncGenerator, Optional
 import mlflow
 from agents import (
   Agent,
+  OpenAIChatCompletionsModel,
   Runner,
   function_tool,
   set_default_openai_api,
   set_default_openai_client,
 )
 from agents.tracing import set_trace_processors
-from databricks_openai import AsyncDatabricksOpenAI, DatabricksFunctionClient
+from databricks_openai import DatabricksFunctionClient
 from mlflow.entities import SpanType
 from mlflow.types.responses import (
   Message,
@@ -47,6 +48,7 @@ from mlflow.types.responses import (
   create_text_output_item,
 )
 
+from .gateway_client import _make_client
 from .prompts import ORIGINAL_PROMPT_TEMPLATE
 
 logger = logging.getLogger(__name__)
@@ -63,152 +65,21 @@ DEMO_CUSTOMER_ID = os.getenv('DEMO_CUSTOMER_ID', 'CUST-00015')
 # when configured, else the plain serving endpoint.
 MODEL = LLM_MODEL_SERVICE or LLM_MODEL
 
-# API + tracing + OpenAI client setup at module import — the proven app
-# pattern: ONE client created once (the Agents SDK Runner, autolog, and the
-# http connection pool all bind to it; re-creating WorkspaceClients per
-# request inside the app runtime intermittently fails auth on the 2nd+
-# request). Both entry points drain the Runner inside asyncio.run and this
-# single client has served multiple sequential requests per process
-# correctly (httpx re-binds its connections to each run's event loop).
-# Route through the participant's AI-Gateway model service when configured —
-# via the OpenAI-NATIVE gateway path ({host}/ai-gateway/openai/v1,
-# use_ai_gateway_native_api=True), which returns proper OpenAI-shaped deltas
-# (the mlflow/v1 path passes Anthropic content blocks through, which the
-# Agents SDK's strict event models reject) — else the plain serving endpoint.
-# ---------------------------------------------------------------------------
-# Reasoning-block normalization. Claude reasoning models (Sonnet 5)
-# stochastically emit Anthropic-style CONTENT BLOCKS (e.g. {"type":
-# "reasoning", ...}) inside the OpenAI-compat streaming delta.content — as a
-# LIST where OpenAI clients expect a string. The OpenAI Agents SDK's strict
-# event models reject that ("ResponseTextDeltaEvent ... Input should be a
-# valid string"). Wrap the client's chat.completions to flatten any
-# block-list content: keep text blocks' text, drop reasoning/redacted blocks.
-# ---------------------------------------------------------------------------
-from databricks_openai.utils.clients import (
-  AsyncDatabricksChat,
-  AsyncDatabricksCompletions,
-)
-from openai.resources.chat.chat import AsyncChat
-
-
-def _flatten_content(content) -> Any:
-  """Anthropic content-block list -> concatenated text ('' if no text)."""
-  if not isinstance(content, list):
-    return content
-  parts = []
-  for block in content:
-    if isinstance(block, dict):
-      if block.get('type') in ('text', 'output_text', 'input_text'):
-        parts.append(block.get('text') or '')
-    elif isinstance(block, str):
-      parts.append(block)
-  return ''.join(parts)
-
-
-class _ReasoningSafeAsyncStream:
-  """AsyncStream wrapper that flattens block-list delta.content per chunk."""
-
-  def __init__(self, stream):
-    self._stream = stream
-
-  def __aiter__(self):
-    return self
-
-  async def __anext__(self):
-    chunk = await self._stream.__anext__()
-    for choice in getattr(chunk, 'choices', None) or []:
-      delta = getattr(choice, 'delta', None)
-      content = getattr(delta, 'content', None)
-      if delta is not None and isinstance(content, list):
-        try:
-          object.__setattr__(delta, 'content', _flatten_content(content))
-        except Exception:
-          pass
-    return chunk
-
-  async def close(self):
-    await self._stream.close()
-
-  def __getattr__(self, name):
-    return getattr(self._stream, name)
-
-
-class _ReasoningSafeCompletions(AsyncDatabricksCompletions):
-  """chat.completions.create with content-block normalization on top of the
-  databricks_openai Claude fixes (strict-stripping, empty-content)."""
-
-  async def create(self, **kwargs):
-    result = await super().create(**kwargs)
-    if kwargs.get('stream'):
-      return _ReasoningSafeAsyncStream(result)
-    for choice in getattr(result, 'choices', None) or []:
-      msg = getattr(choice, 'message', None)
-      if msg is not None and isinstance(getattr(msg, 'content', None), list):
-        try:
-          object.__setattr__(msg, 'content', _flatten_content(msg.content))
-        except Exception:
-          pass
-    return result
-
-
-class _ReasoningSafeChat(AsyncChat):
-  def __init__(self, client):
-    super().__init__(client=client)
-    self.completions = _ReasoningSafeCompletions(client=client)
-
-
-class _GatewayOpenAI(AsyncDatabricksOpenAI):
-  """AsyncDatabricksOpenAI whose chat.completions normalizes reasoning blocks
-  (cached per instance — the base .chat property rebuilds on every access)."""
-
-  @property
-  def chat(self) -> Any:
-    cached = getattr(self, '_rs_chat', None)
-    if cached is None:
-      base_chat = super().chat
-      if isinstance(base_chat, AsyncDatabricksChat):
-        base_chat.completions = _ReasoningSafeCompletions(
-            client=base_chat.completions._client
-        )
-        cached = base_chat
-      else:
-        cached = _ReasoningSafeChat(client=base_chat.completions._client)
-      object.__setattr__(self, '_rs_chat', cached)
-    return cached
-
-
-def _make_client() -> AsyncDatabricksOpenAI:
-  """Build the OpenAI client: the participant's AI-Gateway model service via
-  the OpenAI-NATIVE path ({host}/ai-gateway/openai/v1) when LLM_MODEL_SERVICE
-  is set, else the plain Databricks serving endpoint — always wrapped for
-  reasoning-block safety."""
-  if LLM_MODEL_SERVICE:
-    return _GatewayOpenAI(use_ai_gateway_native_api=True)
-  return _GatewayOpenAI()
-
-
 # ---------------------------------------------------------------------------
 # API + tracing + OpenAI client setup at module import — the proven app
 # pattern: ONE client created once (the Agents SDK Runner, autolog, and the
 # http connection pool all bind to it; re-creating WorkspaceClients per
 # request inside the app runtime intermittently fails auth on the 2nd+
-# request). Both entry points drain the Runner inside asyncio.run and this
-# single client has served multiple sequential requests per process
-# correctly (httpx re-binds its connections to each run's event loop).
+# request). The app's predict_stream uses this global client on the FastAPI
+# process's one event loop; notebook predict() calls instead pass a client of
+# their own (see build_agent), since each runs on a short-lived loop and
+# mlflow.genai.evaluate calls them from parallel threads.
 # ---------------------------------------------------------------------------
 set_default_openai_client(_make_client())
 set_default_openai_api('chat_completions')
 set_trace_processors([])  # let MLflow be the only trace processor
 mlflow.openai.autolog()
 logging.getLogger('mlflow.utils.autologging_utils').setLevel(logging.ERROR)
-
-
-def _configure_client() -> None:
-  """Set a fresh OpenAI client on the Agents SDK, bound to the CURRENT event
-  loop (for short-lived asyncio.run loops, e.g. notebook predict() calls).
-  The app path never calls this — it reuses the module-level client on the
-  FastAPI process's one persistent event loop instead."""
-  set_default_openai_client(_make_client())
 
 
 # ---------------------------------------------------------------------------
@@ -409,16 +280,23 @@ class TextOutputItem(OutputItem):
     object.__setattr__(self, 'content', parts)
 
 
-def build_agent(model: Optional[str] = None) -> Agent:
+def build_agent(model: Optional[str] = None, openai_client=None) -> Agent:
   """Build the banking support Agent with all UC function tools.
 
   The prompt resolves per call (registry load via get_system_prompt_text), so
   A/B-tested / GEPA-optimized registry versions are served immediately.
+  With `openai_client`, the agent uses THAT client instead of the SDK's global
+  default - notebook predict() calls each pass their own, so concurrent calls
+  (mlflow.genai.evaluate runs predict_fn in parallel threads) never share a
+  client bound to another thread's event loop.
   """
+  model = model or MODEL
+  if openai_client is not None:
+    model = OpenAIChatCompletionsModel(model=model, openai_client=openai_client)
   return Agent(
       name='BankingSupportAgent',
       instructions=get_system_prompt_text(),
-      model=model or MODEL,
+      model=model,
       tools=TOOLS,
   )
 
@@ -534,8 +412,9 @@ class BankingAgent:
     mlflow.update_current_trace(request_preview=message)
 
     async def _drain() -> str:
-      _configure_client()  # fresh client bound to THIS run's event loop
-      agent = build_agent(self.model)
+      # A client of its own, bound to THIS run's event loop (never the shared
+      # global default - other threads may be running predict concurrently).
+      agent = build_agent(self.model, openai_client=_make_client())
       conv = _format_history(
           conversation_history or [], message, customer_id or DEMO_CUSTOMER_ID
       )

@@ -4,7 +4,8 @@ import os
 
 import mlflow
 from mlflow.genai.judges import make_judge
-from mlflow.genai.scorers import Guidelines, Safety, RelevanceToQuery
+from mlflow.entities import Feedback
+from mlflow.genai.scorers import Guidelines, Safety, RelevanceToQuery, scorer
 
 from mlflow_demo.utils.mlflow_helpers import generate_evaluation_links
 
@@ -64,7 +65,7 @@ accuracy = make_judge(
   - No fabricated financial data or invented account details
   - If tools returned no data, the response should acknowledge the lack of data rather than guess
   - It is acceptable to provide general banking knowledge as context, but specific claims must be data-backed
-
+  - Rationale must less than 20 characters.
   Respond with 'yes' if the response is factually accurate, or 'no' if it contains errors or fabrications.""",
 )
 
@@ -117,8 +118,73 @@ response_is_grounded = make_judge(
   Respond with 'yes' if the response is grounded in tool results, or 'no' if it contains hallucinated or unsupported claims.""",
 )
 
+# --- Notebook 3's quality problems ---
+
+# Code-based scorer: full account/card/loan/customer IDs must never appear in a
+# response (masked form like ****0439 passes). Deterministic - no judge model.
+# Self-contained (imports inside) so it can also be registered for monitoring.
+@scorer
+def sensitive_data_masking(inputs, outputs, trace) -> Feedback:
+  """Fail when the response exposes a full account/card/loan/customer ID."""
+  import re
+
+  from mlflow.entities import Feedback
+
+  if hasattr(outputs, 'model_dump'):
+    # optimize_prompts passes the predict_fn's ResponsesAgentResponse object
+    outputs = outputs.model_dump()
+  text = outputs
+  if isinstance(outputs, dict):
+    # ResponsesAgentResponse: output[*].content[*].text
+    text = ' '.join(
+        part.get('text', '')
+        for item in outputs.get('output') or []
+        for part in (item.get('content') or [])
+        if isinstance(part, dict)
+    )
+  leaked = sorted(set(re.findall(r'\b(?:ACCT|CARD|LOAN|CUST)-\d{3,}\b', str(text))))
+  return Feedback(
+      value='no' if leaked else 'yes',
+      rationale=f'Unmasked IDs: {leaked}' if leaked else 'No full IDs exposed',
+  )
+
+
+# Guidelines judge: answer only what was asked - no unrequested extras.
+conciseness = Guidelines(
+  name='conciseness',
+  model=JUDGE_MODEL,
+  guidelines=(
+    'The response answers only what the customer asked. It does not add tables, extra '
+    'totals, or breakdowns the customer did not request, and it does not end with offers '
+    'of further help such as "Let me know if you would like...".'
+  ),
+)
+
+def fail_safe(scorer_to_wrap):
+  """The same scorer, but an error becomes a 'no' verdict instead of an exception.
+
+  mlflow.genai.evaluate records scorer errors per row, but optimize_prompts
+  (GEPA) does not - one malformed judge reply would stop the whole
+  optimization. Use for scorers passed to optimize_prompts.
+  """
+
+  @scorer(name=scorer_to_wrap.name)
+  def _guarded(inputs, outputs, expectations, trace):
+    try:
+      return scorer_to_wrap.run(
+          inputs=inputs, outputs=outputs, expectations=expectations, trace=trace
+      )
+    except Exception as e:
+      return Feedback(value='no', rationale=f'Scorer error (counted as a fail): {e}')
+
+  return _guarded
+
+
 # Convenience list of all scorers for easy use in evaluation
-SCORERS = [tone, safety, relevance_to_query, accuracy, relevance, actionability, response_is_grounded]
+SCORERS = [
+  tone, safety, relevance_to_query, accuracy, relevance, actionability, response_is_grounded,
+  sensitive_data_masking, conciseness,
+]
 
 
 def get_scorers(prefix=''):

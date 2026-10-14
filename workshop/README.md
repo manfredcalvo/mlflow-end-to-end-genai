@@ -93,7 +93,7 @@ databricks bundle run bank_agent --target dev --profile banking
 The prompt, sample traces, and baseline evaluations are **part of the workshop itself**:
 importing the agent (notebook 1, step 1) registers the `<prefix>_bank_support_prompt` if
 it doesn't exist (the app falls back to its built-in prompt until then), notebook 1's
-step 4 generates the 10 sample traces, and notebook 2's evaluate run attaches the judges'
+step 4 generates the 20 sample traces, and notebook 2's evaluate run attaches the judges'
 assessments that the later notebooks build on.
 
 What gets derived from their username (e.g. `jane.doe@x.com` → prefix `jane_doe`):
