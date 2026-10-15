@@ -26,8 +26,8 @@ def get_dab_experiment_name(user_email: str) -> str:
 # Shared-workshop defaults surfaced as notebook widgets. The instructor sets these
 # once per workspace; participants can override them per-run in the widget bar.
 WIDGET_DEFAULTS = {
-  'catalog': 'workshop_bank',
-  'schema': 'shared_data',
+  'catalog': 'casaman_aws_stable_catalog',
+  'schema': 'banking_workshop',
   'warehouse': 'd9ce200bcd25d8a2',
 }
 
