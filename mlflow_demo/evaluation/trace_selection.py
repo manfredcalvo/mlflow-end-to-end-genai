@@ -53,6 +53,45 @@ def _row_parts(trace_row):
   return [_row_assessment_dicts(a) for a in raw], trace_id, _question_text(question)
 
 
+def latest_sample_traces(max_results, return_type='pandas'):
+  """The most recent `sample_data` traces, at most ONE per question.
+
+  Adding traces to a labeling session (notebook 4) writes copies of them back
+  into the experiment - same tags (sample_data=yes), same question, same
+  request time - so a plain search returns duplicates that crowd out the
+  other questions. Among duplicates, keep the trace with the most assessments
+  (the original carries notebook 2's judge verdicts; a fresh copy has none),
+  then the most recent.
+  """
+  import mlflow
+
+  search = dict(filter_string='tags.sample_data = "yes"', max_results=1000,
+                order_by=['timestamp DESC'])
+  if return_type == 'list':
+    traces = mlflow.search_traces(return_type='list', **search)
+    best = {}
+    for t in traces:
+      key = _question_text(t.data.request)
+      rank = (len(t.info.assessments or []), t.info.request_time)
+      if key not in best or rank > best[key][0]:
+        best[key] = (rank, t)
+    picked = sorted((t for _, t in best.values()), key=lambda t: t.info.request_time, reverse=True)
+    return picked[:max_results]
+
+  df = mlflow.search_traces(**search)
+  if df.empty:
+    return df
+  df = df.assign(
+      _question=df['request'].map(lambda r: str(_question_text(r))),
+      _n_assessments=df['assessments'].map(lambda a: len(a) if a is not None else 0),
+  )
+  df = (df.sort_values(['_n_assessments', 'request_time'], ascending=False)
+          .drop_duplicates('_question')
+          .sort_values('request_time', ascending=False)
+          .head(max_results))
+  return df.drop(columns=['_question', '_n_assessments']).reset_index(drop=True)
+
+
 def select_issue_and_regression(traces, max_issues=10, max_regression=5):
   """Split a search_traces DataFrame into (issue_records, regression_records, issues).
 
